@@ -1,0 +1,4 @@
+Archive/
+venv/
+.env
+.DS_Store

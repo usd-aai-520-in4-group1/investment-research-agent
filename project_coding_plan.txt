@@ -1,0 +1,29 @@
+. Investment Research Agent .
+Member 1: Agent Core Functions & Tooling Focus on the fundamental Agent Functions and the integration of necessary Tools (APIs/Datasets). Establishing the core intelligence and resource access for the Investment Research Agent.
+Core Tasks
+1. Agent Initialization and Setup:
+○ Task 1.1: Environment and GitHub Repository Setup ○ Task 1.2: Base Agent Class/Function: Write the foundational Python class or function for the InvestmentResearchAgent.
+2. Tool Integration (APIs/Datasets): ○ Task 1.3: Data Wrapper for Yahoo Finance: Write a robust Python module (data_tools.py) to connect to and retrieve data from Yahoo Finance (yfinance). Create functions to fetch historical prices, key financials, and stock news. ○ Task 1.4: Secondary API Integration (Alpha Vantage): Integrate a second API (e.g., Alpha Vantage free tier) for diversification, creating functions to retrieve specific data points (e.g., earning reports, company overview) that complement Yahoo Finance.
+3. Core Agent Logic Implementation:
+○ Task 1.5: Dynamic Tool Usage Logic: Implement the agent's ability to dynamically select and use the created tools (from Tasks 1.3 and 1.4) based on the current research step. ○ Task 1.6: Planning Logic: Implement the agent's Planning mechanism. The agent must take a stock symbol and generate a sequence of logical steps (e.g., 1. Fetch financial data. 2. Analyze analyst ratings. 3. Get latest news. ).
+Member 2: Agent Workflows & Reflection Focus on implementing two of the required Workflow Patterns and the advanced cognitive functions of the agent. Ensuring the research process is structured and iterative.
+Core Tasks 1. Workflow Pattern 2: Routing: ○ Task 2.1: Specialist Definition: Define three "specialist" analyzer functions : EarningsAnalyzer (primary), MarketAnalyzer (primary) and NewsAnalyzer (secondary).
+○ Task 2.2: Router Implementation: Create a Routing mechanism (e.g., a small LLM call or a rule-based function) that takes an input (e.g., a chunk of event notification or news) and directs it to the appropriate specialist for analysis. 2. Workflow Pattern 3: Evaluator–Optimizer (Self-Reflection):
+○ Task 2.3: Evaluation Logic: Implement the Evaluator function. This function takes the final analysis output and a set of criteria (e.g., "Did it use three data points?", "Is the conclusion justified?") and generates an assessment score or feedback. This directly addresses the Self-reflects requirement.
+○ Task 2.4: Optimization/Refinement Logic: Implement the Optimizer function. This function takes the original analysis and the feedback from the Evaluator (Task 2.3) and generates a refined, improved analysis.
+3. Learning/Memory Implementation:
+○ Task 2.5: Brief Memory/Notes System: Implement a simple mechanism for the agent to learn across runs. This could be a small function that saves a brief note (e.g., “High volume stock, always check earnings date”) to a text file after a run to improve the Planning or Evaluator logic in future runs.
+Member 3: Prompt Chaining, Integration & Documentation Focus on the remaining Workflow Pattern, integrating all pieces together, ensuring the code adheres to standards, and compiling the final Code Notebook documentation.
+Core Tasks 1. Workflow Pattern 1: Prompt Chaining:
+○ Task 3.1: Sequential Prompt Functions: Implement the sequential steps of the Prompt Chaining pattern: ■ IngestNews: Takes raw news articles (from Member 1's tools). ■ Preprocess: Cleans and formats the text. ■ Classify: Identifies sentiment (positive, negative, neutral). ■ Extract: Pulls out key entities (company, product, metric). ■ Summarize: Creates a final, concise summary.
+2. Code Integration and Quality Control:
+○ Task 3.2: Full Workflow Integration: Final Collaboration to create the main execution notebook. This involves connecting:
+■ The Agent's Planning (M1)
+■ The Tool Usage (M1)
+■ The Prompt Chaining (M3)
+■ The Routing (M2)
+■ The Evaluator–Optimizer (M2)
+○ Task 3.3: Code Compliance: Review all Python code
+3. Final Deliverables and Documentation:
+○ Task 3.4: Code Notebook Creation: Compile the final Jupyter/Code Notebook, ensuring all code runs sequentially and correctly.
+○ Task 3.5: Notebook Documentation: as required for submission.
