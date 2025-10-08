@@ -48,7 +48,7 @@ Before running the project, ensure you have:
 
 2. **Install required dependencies**:
    ```bash
-   pip install pandas numpy yfinance ta langgraph langchain-openai langchain-core rich python-dotenv
+   pip install -r requirements.txt
    ```
 
 3. **Set up your OpenAI API key**:
