@@ -195,7 +195,22 @@
         "query",
         "routing"
       ]
+    },
+    {
+      "timestamp": "2025-10-16T23:31:59.894599",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I buy this stock based on technical analysis?... Result: ### Price Action Analysis for GOOG\n\nCurrent Price: **$254.68**\n\n#### 1. **Trend Direction and Strength**\nThe current price of GOOG is above the 20-day Simple Moving Average (SMA_20), which is currentl...",
+      "context": {
+        "query": "Should I buy this stock based on technical analysis?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
     }
   ],
-  "last_updated": "2025-10-16T18:44:39.965254"
+  "last_updated": "2025-10-16T23:31:59.894807"
 }
