@@ -11,6 +11,8 @@ import datetime as dt
 from typing import Dict, List, Any, Optional, Union, TypedDict, Annotated
 from datetime import datetime
 from dataclasses import dataclass, asdict
+import requests
+import time
 
 # Core dependencies
 import pandas as pd
@@ -19,6 +21,7 @@ import yfinance as yf
 from ta.momentum import RSIIndicator, StochasticOscillator
 from ta.trend import SMAIndicator, EMAIndicator, MACD
 from ta.volume import volume_weighted_average_price
+from sympy import sympify
 
 # LangGraph and OpenAI imports
 from langgraph.graph import StateGraph, START, END
@@ -40,6 +43,8 @@ from rich import print as rprint
 import dotenv
 dotenv.load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("OPENKEY")
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # Setup logging with rich
 console = Console()
@@ -66,9 +71,12 @@ class State(TypedDict):
     analysis_data: Dict[str, Any]
     final_analysis: Dict[str, Any]
 
+
 # =============================================================================
 # CORE DATA TOOLS
 # =============================================================================
+
+
 
 class YahooFinanceDataWrapper:
     """Yahoo Finance data wrapper with technical analysis."""
@@ -267,6 +275,606 @@ class YahooFinanceDataWrapper:
                 progress.update(task, description=f"[red]Error fetching news: {str(e)}")
                 return {"error": f"Error fetching news: {str(e)}"}
 
+
+
+
+
+class AlphaVantageDataWrapper:
+    """Alpha Vantage data wrapper for stock market data, technical indicators, and news."""
+    
+    BASE_URL = "https://www.alphavantage.co/query"
+    
+    def __init__(self, api_key: str = None):
+        """Initialize Alpha Vantage wrapper with API key."""
+        self.api_key = api_key or ALPHA_VANTAGE_API_KEY
+        if not self.api_key:
+            console.print("[bold red]Warning: Alpha Vantage API key not found. Set ALPHA_VANTAGE_API_KEY environment variable.[/bold red]")
+        else:
+            console.print("[bold green]Alpha Vantage Data Wrapper initialized[/bold green]")
+    
+    def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Make API request to Alpha Vantage."""
+        if not self.api_key:
+            return {"error": "Alpha Vantage API key not configured"}
+        
+        params['apikey'] = self.api_key
+        
+        try:
+            response = requests.get(self.BASE_URL, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Check for API error messages
+            if "Error Message" in data:
+                return {"error": data["Error Message"]}
+            if "Note" in data:
+                return {"error": f"API limit reached: {data['Note']}"}
+            
+            return data
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Request failed: {str(e)}"}
+        except json.JSONDecodeError as e:
+            return {"error": f"Failed to parse response: {str(e)}"}
+    
+    def fetch_quote(self, symbol: str) -> Dict[str, Any]:
+        """Fetch real-time quote data for a stock symbol."""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Fetching quote for {symbol}...", total=None)
+            
+            try:
+                params = {
+                    'function': 'GLOBAL_QUOTE',
+                    'symbol': symbol
+                }
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                quote = data.get('Global Quote', {})
+                
+                if not quote:
+                    progress.update(task, description=f"[red]No quote data found for {symbol}")
+                    return {"error": f"No quote data found for {symbol}"}
+                
+                result = {
+                    "symbol": quote.get('01. symbol', symbol),
+                    "price": float(quote.get('05. price', 0)),
+                    "change": float(quote.get('09. change', 0)),
+                    "change_percent": quote.get('10. change percent', '0%'),
+                    "volume": int(quote.get('06. volume', 0)),
+                    "latest_trading_day": quote.get('07. latest trading day', 'N/A'),
+                    "previous_close": float(quote.get('08. previous close', 0)),
+                    "open": float(quote.get('02. open', 0)),
+                    "high": float(quote.get('03. high', 0)),
+                    "low": float(quote.get('04. low', 0)),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched quote for {symbol}")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching quote: {str(e)}"}
+    
+    def fetch_daily_prices(self, symbol: str, outputsize: str = "compact") -> Dict[str, Any]:
+        """
+        Fetch daily historical prices.
+        outputsize: 'compact' (last 100 data points) or 'full' (up to 20 years)
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Fetching daily prices for {symbol}...", total=None)
+            
+            try:
+                params = {
+                    'function': 'TIME_SERIES_DAILY',
+                    'symbol': symbol,
+                    'outputsize': outputsize
+                }
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                time_series = data.get('Time Series (Daily)', {})
+                
+                if not time_series:
+                    progress.update(task, description=f"[red]No daily data found for {symbol}")
+                    return {"error": f"No daily data found for {symbol}"}
+                
+                # Convert to list of dictionaries
+                prices = []
+                for date, values in sorted(time_series.items(), reverse=True)[:100]:
+                    prices.append({
+                        'date': date,
+                        'open': float(values.get('1. open', 0)),
+                        'high': float(values.get('2. high', 0)),
+                        'low': float(values.get('3. low', 0)),
+                        'close': float(values.get('4. close', 0)),
+                        'volume': int(values.get('5. volume', 0))
+                    })
+                
+                # Calculate basic statistics
+                closes = [p['close'] for p in prices]
+                volumes = [p['volume'] for p in prices]
+                
+                result = {
+                    "symbol": symbol,
+                    "data_points": len(prices),
+                    "prices": prices,
+                    "latest_price": prices[0]['close'] if prices else 0,
+                    "stats": {
+                        "avg_close": float(np.mean(closes)) if closes else 0,
+                        "avg_volume": float(np.mean(volumes)) if volumes else 0,
+                        "max_price": float(max(closes)) if closes else 0,
+                        "min_price": float(min(closes)) if closes else 0,
+                        "volatility": float(np.std(closes)) if closes else 0
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched {len(prices)} days of data for {symbol}")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching daily prices: {str(e)}"}
+    
+    def fetch_company_overview(self, symbol: str) -> Dict[str, Any]:
+        """Fetch company overview and fundamental data."""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Fetching company overview for {symbol}...", total=None)
+            
+            try:
+                params = {
+                    'function': 'OVERVIEW',
+                    'symbol': symbol
+                }
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                if not data or 'Symbol' not in data:
+                    progress.update(task, description=f"[red]No overview data found for {symbol}")
+                    return {"error": f"No overview data found for {symbol}"}
+                
+                result = {
+                    "symbol": data.get('Symbol', symbol),
+                    "company_name": data.get('Name', 'N/A'),
+                    "description": data.get('Description', 'N/A'),
+                    "sector": data.get('Sector', 'N/A'),
+                    "industry": data.get('Industry', 'N/A'),
+                    "exchange": data.get('Exchange', 'N/A'),
+                    "market_cap": data.get('MarketCapitalization', 'N/A'),
+                    "pe_ratio": data.get('PERatio', 'N/A'),
+                    "peg_ratio": data.get('PEGRatio', 'N/A'),
+                    "book_value": data.get('BookValue', 'N/A'),
+                    "dividend_yield": data.get('DividendYield', 'N/A'),
+                    "eps": data.get('EPS', 'N/A'),
+                    "revenue_ttm": data.get('RevenueTTM', 'N/A'),
+                    "profit_margin": data.get('ProfitMargin', 'N/A'),
+                    "operating_margin": data.get('OperatingMarginTTM', 'N/A'),
+                    "return_on_assets": data.get('ReturnOnAssetsTTM', 'N/A'),
+                    "return_on_equity": data.get('ReturnOnEquityTTM', 'N/A'),
+                    "beta": data.get('Beta', 'N/A'),
+                    "52_week_high": data.get('52WeekHigh', 'N/A'),
+                    "52_week_low": data.get('52WeekLow', 'N/A'),
+                    "50_day_ma": data.get('50DayMovingAverage', 'N/A'),
+                    "200_day_ma": data.get('200DayMovingAverage', 'N/A'),
+                    "analyst_target_price": data.get('AnalystTargetPrice', 'N/A'),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched company overview for {symbol}")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching company overview: {str(e)}"}
+    
+    def fetch_technical_indicator(self, symbol: str, indicator: str = "RSI", 
+                                  interval: str = "daily", time_period: int = 14) -> Dict[str, Any]:
+        """
+        Fetch technical indicators.
+        indicator: RSI, MACD, SMA, EMA, STOCH, ADX, CCI, AROON, BBANDS, etc.
+        interval: 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Fetching {indicator} for {symbol}...", total=None)
+            
+            try:
+                params = {
+                    'function': indicator.upper(),
+                    'symbol': symbol,
+                    'interval': interval,
+                    'time_period': time_period,
+                    'series_type': 'close'
+                }
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                # Find the technical analysis key (varies by indicator)
+                tech_key = None
+                for key in data.keys():
+                    if 'Technical Analysis' in key:
+                        tech_key = key
+                        break
+                
+                if not tech_key or not data.get(tech_key):
+                    progress.update(task, description=f"[red]No {indicator} data found for {symbol}")
+                    return {"error": f"No {indicator} data found for {symbol}"}
+                
+                tech_data = data[tech_key]
+                
+                # Get latest values
+                latest_values = []
+                for date, values in sorted(tech_data.items(), reverse=True)[:30]:
+                    entry = {'date': date}
+                    entry.update({k: float(v) for k, v in values.items()})
+                    latest_values.append(entry)
+                
+                result = {
+                    "symbol": symbol,
+                    "indicator": indicator.upper(),
+                    "interval": interval,
+                    "time_period": time_period,
+                    "latest_value": latest_values[0] if latest_values else {},
+                    "values": latest_values,
+                    "metadata": data.get('Meta Data', {}),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched {indicator} for {symbol}")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching technical indicator: {str(e)}"}
+    
+    def fetch_market_news_sentiment(self, tickers: str = None, topics: str = None, 
+                                    time_from: str = None, time_to: str = None,
+                                    limit: int = 50) -> Dict[str, Any]:
+        """
+        Fetch market news and sentiment data.
+        tickers: comma-separated list of tickers (e.g., "AAPL,MSFT")
+        topics: blockchain, earnings, ipo, mergers_and_acquisitions, financial_markets, etc.
+        time_from/time_to: YYYYMMDDTHHMM format
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("[cyan]Fetching market news and sentiment...", total=None)
+            
+            try:
+                params = {
+                    'function': 'NEWS_SENTIMENT',
+                    'limit': limit
+                }
+                
+                if tickers:
+                    params['tickers'] = tickers
+                if topics:
+                    params['topics'] = topics
+                if time_from:
+                    params['time_from'] = time_from
+                if time_to:
+                    params['time_to'] = time_to
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                feed = data.get('feed', [])
+                
+                if not feed:
+                    progress.update(task, description="[yellow]No news articles found")
+                    return {"articles": [], "message": "No news articles found"}
+                
+                articles = []
+                for article in feed:
+                    processed_article = {
+                        "title": article.get('title', 'N/A'),
+                        "url": article.get('url', 'N/A'),
+                        "time_published": article.get('time_published', 'N/A'),
+                        "authors": article.get('authors', []),
+                        "summary": article.get('summary', 'N/A'),
+                        "source": article.get('source', 'N/A'),
+                        "category_within_source": article.get('category_within_source', 'N/A'),
+                        "overall_sentiment_score": article.get('overall_sentiment_score', 0),
+                        "overall_sentiment_label": article.get('overall_sentiment_label', 'neutral'),
+                        "ticker_sentiment": article.get('ticker_sentiment', [])
+                    }
+                    articles.append(processed_article)
+                
+                # Calculate aggregate sentiment if tickers provided
+                sentiment_summary = {}
+                if tickers:
+                    for ticker in tickers.split(','):
+                        ticker = ticker.strip()
+                        ticker_scores = []
+                        for article in articles:
+                            for ts in article.get('ticker_sentiment', []):
+                                if ts.get('ticker') == ticker:
+                                    ticker_scores.append(float(ts.get('ticker_sentiment_score', 0)))
+                        
+                        if ticker_scores:
+                            sentiment_summary[ticker] = {
+                                "average_sentiment": float(np.mean(ticker_scores)),
+                                "sentiment_std": float(np.std(ticker_scores)),
+                                "article_count": len(ticker_scores)
+                            }
+                
+                result = {
+                    "total_articles": len(articles),
+                    "articles": articles,
+                    "sentiment_summary": sentiment_summary,
+                    "items": data.get('items', 0),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched {len(articles)} news articles")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching news sentiment: {str(e)}"}
+    
+    def fetch_earnings(self, symbol: str) -> Dict[str, Any]:
+        """Fetch earnings data for a stock."""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Fetching earnings for {symbol}...", total=None)
+            
+            try:
+                params = {
+                    'function': 'EARNINGS',
+                    'symbol': symbol
+                }
+                
+                data = self._make_request(params)
+                
+                if "error" in data:
+                    progress.update(task, description=f"[red]{data['error']}")
+                    return data
+                
+                annual_earnings = data.get('annualEarnings', [])
+                quarterly_earnings = data.get('quarterlyEarnings', [])
+                
+                result = {
+                    "symbol": symbol,
+                    "annual_earnings": annual_earnings[:5],  # Last 5 years
+                    "quarterly_earnings": quarterly_earnings[:8],  # Last 8 quarters
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully fetched earnings for {symbol}")
+                return result
+                
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {"error": f"Error fetching earnings: {str(e)}"}
+
+
+class WebToolsWrapper:
+    """Web tools wrapper for web search and calculator functionality."""
+    
+    def __init__(self, api_key: str = None):
+        """Initialize web tools wrapper with Tavily API key."""
+        self.api_key = api_key or TAVILY_API_KEY
+        if not self.api_key:
+            console.print("[bold red]Warning: Tavily API key not found. Web search functionality will be limited.[/bold red]")
+        else:
+            console.print("[bold green]Web Tools Wrapper initialized[/bold green]")
+    
+    def web_search(self, query: str) -> Dict[str, Any]:
+        """
+        Performs a web search using the Tavily API to get real-time information from the internet.
+        
+        Args:
+            query (str): The search query to look up on the web.
+            
+        Returns:
+            Dict[str, Any]: A dictionary containing search results and metadata.
+            
+        Use this tool when you need:
+        - Current information or recent events
+        - Real-time data (weather, news, stock prices, etc.)
+        - Information not in your training data
+        - To verify or fact-check current information
+        
+        Example:
+            web_search("current Tesla stock news")
+            web_search("latest AI trends 2025")
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Searching web for: {query}...", total=None)
+            
+            if not self.api_key:
+                progress.update(task, description="[red]Tavily API key not configured")
+                return {
+                    "error": "TAVILY_API_KEY not found in environment variables. Please set it in your .env file.",
+                    "query": query,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            try:
+                url = "https://api.tavily.com/search"
+                payload = {
+                    "api_key": self.api_key,
+                    "query": query,
+                    "search_depth": "basic",
+                    "include_answer": True,
+                    "max_results": 3
+                }
+                
+                response = requests.post(url, json=payload, timeout=30)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                # Extract answer if available
+                answer = data.get("answer", "")
+                
+                # Extract results
+                results = []
+                if "results" in data:
+                    for result in data["results"][:3]:
+                        results.append({
+                            "title": result.get("title", ""),
+                            "content": result.get("content", ""),
+                            "url": result.get("url", ""),
+                            "score": result.get("score", 0)
+                        })
+                
+                result_data = {
+                    "query": query,
+                    "answer": answer,
+                    "results": results,
+                    "total_results": len(results),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Successfully found {len(results)} results")
+                return result_data
+                
+            except requests.exceptions.RequestException as e:
+                progress.update(task, description=f"[red]Request error: {str(e)}")
+                return {
+                    "error": f"Error performing web search: {str(e)}",
+                    "query": query,
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                progress.update(task, description=f"[red]Unexpected error: {str(e)}")
+                return {
+                    "error": f"Unexpected error: {str(e)}",
+                    "query": query,
+                    "timestamp": datetime.now().isoformat()
+                }
+    
+    def calculator(self, expression: str) -> Dict[str, Any]:
+        """
+        Safely evaluates mathematical expressions and returns the result.
+        
+        Args:
+            expression (str): A mathematical expression to evaluate (e.g., "2 + 2", "15 * 3.5").
+            
+        Returns:
+            Dict[str, Any]: A dictionary containing the calculation result and metadata.
+            
+        Use this tool when you need to:
+        - Perform arithmetic calculations
+        - Add, subtract, multiply, or divide numbers
+        - Calculate percentages or other mathematical operations
+        - Compute financial ratios and metrics
+        
+        Supported operations: +, -, *, /, //, %, **
+        
+        Example:
+            calculator("10 + 5")  # Returns {"result": "15", ...}
+            calculator("100 / 4")  # Returns {"result": "25.0", ...}
+            calculator("2 ** 8")   # Returns {"result": "256", ...}
+        
+        Note: For security, this only evaluates mathematical expressions and does not execute arbitrary code.
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Calculating: {expression}...", total=None)
+            
+            try:
+                # Clean the expression
+                expression = expression.strip()
+                
+                # Only allow specific characters (numbers, operators, parentheses, decimal point, spaces)
+                allowed_chars = set("0123456789+-*/().% ")
+                if not all(c in allowed_chars for c in expression):
+                    progress.update(task, description="[red]Invalid characters in expression")
+                    return {
+                        "error": "Expression contains invalid characters. Only use numbers and basic operators (+, -, *, /, %, ()).",
+                        "expression": expression,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                
+                # Evaluate the expression safely using sympify
+                result = sympify(expression).evalf()
+                
+                # Convert the numeric result to a string for consistent return type
+                result_str = str(result)
+                
+                result_data = {
+                    "expression": expression,
+                    "result": result_str,
+                    "success": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                progress.update(task, description=f"[green]Result: {result_str}")
+                return result_data
+                
+            except ZeroDivisionError:
+                progress.update(task, description="[red]Division by zero error")
+                return {
+                    "error": "Division by zero.",
+                    "expression": expression,
+                    "timestamp": datetime.now().isoformat()
+                }
+            except SyntaxError:
+                progress.update(task, description="[red]Syntax error")
+                return {
+                    "error": "Invalid mathematical expression syntax.",
+                    "expression": expression,
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                progress.update(task, description=f"[red]Error: {str(e)}")
+                return {
+                    "error": f"Error evaluating expression: {str(e)}",
+                    "expression": expression,
+                    "timestamp": datetime.now().isoformat()
+                }
+
 # =============================================================================
 # LANGGRAPH TOOLS
 # =============================================================================
@@ -309,6 +917,42 @@ def get_financial_metrics(ticker: str) -> Union[Dict, str]:
         }
     except Exception as e:
         return f"Error fetching ratios: {str(e)}"
+
+@tool
+def search_web(query: str) -> Union[Dict, str]:
+    """Performs a web search to get real-time information from the internet."""
+    try:
+        wrapper = WebToolsWrapper()
+        result = wrapper.web_search(query)
+        
+        if "error" in result:
+            return result["error"]
+        
+        return {
+            'answer': result.get('answer', ''),
+            'results': result.get('results', []),
+            'total_results': result.get('total_results', 0)
+        }
+    except Exception as e:
+        return f"Error performing web search: {str(e)}"
+
+@tool
+def calculate(expression: str) -> Union[Dict, str]:
+    """Safely evaluates mathematical expressions and returns the result."""
+    try:
+        wrapper = WebToolsWrapper()
+        result = wrapper.calculator(expression)
+        
+        if "error" in result:
+            return result["error"]
+        
+        return {
+            'expression': result.get('expression', ''),
+            'result': result.get('result', ''),
+            'success': result.get('success', False)
+        }
+    except Exception as e:
+        return f"Error calculating expression: {str(e)}"
 
 # =============================================================================
 # ANALYZERS
@@ -569,11 +1213,12 @@ class InvestmentAgent:
     
     def __init__(self, config_path: Optional[str] = None):
         self.config = self._load_config(config_path)
-        self.tools = [get_stock_prices, get_financial_metrics]
+        self.tools = [get_stock_prices, get_financial_metrics, search_web, calculate]
         self.llm = ChatOpenAI(model='gpt-4o-mini', openai_api_key=OPENAI_API_KEY)
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.graph = self._build_graph()
         self.data_wrapper = YahooFinanceDataWrapper()
+        self.web_tools_wrapper = WebToolsWrapper()
         self.analyzer = Analyzer()
         self.memory_system = MemorySystem()
         self.results = {}
@@ -617,17 +1262,22 @@ class InvestmentAgent:
         You have access to the following tools:
         1. **get_stock_prices**: Retrieves stock price data and technical indicators.
         2. **get_financial_metrics**: Retrieves key financial metrics and ratios.
+        3. **search_web**: Performs web searches to get real-time information from the internet.
+        4. **calculate**: Evaluates mathematical expressions for financial calculations.
 
         ### Your Task:
         1. Use the provided stock symbol to query the tools and collect data.
-        2. Analyze the results and identify trends and patterns.
-        3. Provide a comprehensive summary with specific recommendations.
+        2. Use search_web to get the latest news and market sentiment about the stock.
+        3. Use calculate when you need to perform financial calculations (ratios, percentages, etc.).
+        4. Analyze the results and identify trends and patterns.
+        5. Provide a comprehensive summary with specific recommendations.
 
         ### Output Format:
         Respond with:
         "stock": "<Stock Symbol>",
         "price_analysis": "<Analysis of price trends and technical indicators>",
         "financial_analysis": "<Analysis of financial metrics and valuation>",
+        "market_sentiment": "<Analysis based on web search results>",
         "final_summary": "<Overall conclusion based on all analyses>",
         "recommendation": "<Specific investment recommendation>"
 
@@ -799,6 +1449,30 @@ def main():
         print(f"\nRecommendations:")
         for i, rec in enumerate(analysis['recommendations'], 1):
             print(f"{i}. {rec}")
+            
+        # Create recommendations directory if it doesn't exist
+        os.makedirs('recommendations', exist_ok=True)
+        
+        # Generate markdown content
+        markdown_content = f"""
+# Investment Analysis for {stock_symbol}
+
+## Analysis Summary
+{analysis['ai_analysis']}
+
+## Recommendations
+"""
+        for i, rec in enumerate(analysis['recommendations'], 1):
+            markdown_content += f"{i}. {rec}\n"
+            
+        markdown_content += f"\n\n*Generated on: {datetime.now().isoformat()}*"
+        
+        # Save markdown file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"recommendations/{stock_symbol}_{timestamp}.md"
+        with open(filename, 'w') as f:
+            f.write(markdown_content)
+        print(f"\nAnalysis saved to: {filename}")
     else:
         print(f"✗ Analysis failed: {result.get('error', 'Unknown error')}")
     

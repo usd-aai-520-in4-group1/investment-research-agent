@@ -2,3 +2,7 @@ Archive/
 venv/
 .env
 .DS_Store
+agentic_from_scratch/
+*.zip
+
+
