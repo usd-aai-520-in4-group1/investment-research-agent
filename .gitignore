@@ -1,8 +1,10 @@
 Archive/
-venv/
+venv*/
 .env
 .DS_Store
 agentic_from_scratch/
 *.zip
-
+self_reference/
+test_agentic_usage.py
+__pycache__/
 

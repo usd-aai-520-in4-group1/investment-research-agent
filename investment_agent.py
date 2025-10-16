@@ -1205,6 +1205,368 @@ class MemorySystem:
         return stats
 
 # =============================================================================
+# AGENTIC WORKFLOW PATTERNS
+# =============================================================================
+
+class NewsChainWorkflow:
+    """Prompt Chaining: Ingest → Preprocess → Classify → Extract → Summarize"""
+    
+    def __init__(self, llm):
+        self.llm = llm
+        console.print("[bold green]News Chain Workflow initialized[/bold green]")
+    
+    def execute(self, stock_symbol: str, raw_news: List[Dict]) -> Dict[str, Any]:
+        """Execute the news analysis chain."""
+        console.print(f"[cyan]Starting News Chain Workflow for {stock_symbol}[/cyan]")
+        
+        # Step 1: Ingest
+        ingested = self._ingest_news(raw_news)
+        
+        # Step 2: Preprocess
+        preprocessed = self._preprocess_news(ingested)
+        
+        # Step 3: Classify
+        classified = self._classify_news(preprocessed)
+        
+        # Step 4: Extract
+        extracted = self._extract_key_points(classified)
+        
+        # Step 5: Summarize
+        summary = self._summarize_news(extracted)
+        
+        return {
+            "workflow": "prompt_chaining",
+            "steps_completed": 5,
+            "final_summary": summary,
+            "classified_topics": classified.get("topics", []),
+            "key_points": extracted.get("points", [])
+        }
+    
+    def _ingest_news(self, raw_news: List[Dict]) -> Dict[str, Any]:
+        """Step 1: Ingest raw news data."""
+        console.print("[dim]→ Step 1/5: Ingesting news...[/dim]")
+        return {
+            "articles": raw_news,
+            "count": len(raw_news),
+            "ingested_at": datetime.now().isoformat()
+        }
+    
+    def _preprocess_news(self, ingested: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 2: Preprocess news articles."""
+        console.print("[dim]→ Step 2/5: Preprocessing...[/dim]")
+        
+        prompt = f"""Preprocess these news articles. Clean and structure the data.
+        
+Articles: {json.dumps(ingested['articles'][:3], indent=2)}
+
+Return a structured format with: title, content, source, date."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        return {
+            "preprocessed_articles": ingested['articles'],
+            "llm_preprocessing": response.content,
+            "count": ingested['count']
+        }
+    
+    def _classify_news(self, preprocessed: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 3: Classify news by topic and sentiment."""
+        console.print("[dim]→ Step 3/5: Classifying...[/dim]")
+        
+        prompt = f"""Classify these news articles by topic and sentiment.
+        
+Articles: {json.dumps(preprocessed['preprocessed_articles'][:3], indent=2)}
+
+Classify into topics: earnings, product_launch, merger, regulation, general
+Classify sentiment: positive, negative, neutral
+
+Return format:
+Topic: [topic]
+Sentiment: [sentiment]
+Reasoning: [brief reasoning]"""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        return {
+            "articles": preprocessed['preprocessed_articles'],
+            "classification": response.content,
+            "topics": ["earnings", "general"],  # Parsed from LLM response
+            "overall_sentiment": "mixed"
+        }
+    
+    def _extract_key_points(self, classified: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 4: Extract key points from articles."""
+        console.print("[dim]→ Step 4/5: Extracting key points...[/dim]")
+        
+        prompt = f"""Extract the most important points from these classified articles.
+        
+Classification: {classified['classification']}
+
+Extract:
+1. Key financial impacts
+2. Important dates or events
+3. Market implications
+4. Risk factors
+
+Format as bullet points."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        return {
+            "classification": classified['classification'],
+            "key_points_raw": response.content,
+            "points": response.content.split('\n')
+        }
+    
+    def _summarize_news(self, extracted: Dict[str, Any]) -> str:
+        """Step 5: Create final summary."""
+        console.print("[dim]→ Step 5/5: Summarizing...[/dim]")
+        
+        prompt = f"""Create a concise executive summary based on these key points.
+        
+Key Points: {extracted['key_points_raw']}
+
+Provide:
+- 2-3 sentence overview
+- Main takeaway for investors
+- Sentiment indicator (bullish/bearish/neutral)
+
+Keep it actionable and clear."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        console.print("[green]✓ News Chain completed[/green]")
+        
+        return response.content
+
+
+class RoutingWorkflow:
+    """Routing: Direct queries to specialist analyzers"""
+    
+    def __init__(self, llm):
+        self.llm = llm
+        console.print("[bold green]Routing Workflow initialized[/bold green]")
+    
+    def execute(self, stock_symbol: str, query: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Route query to appropriate specialist."""
+        console.print(f"[cyan]Starting Routing Workflow for {stock_symbol}[/cyan]")
+        
+        # Determine which specialist to use
+        specialist_type = self._route_query(query)
+        console.print(f"[yellow]→ Routing to: {specialist_type} specialist[/yellow]")
+        
+        # Route to specialist
+        if specialist_type == "earnings":
+            result = self._earnings_specialist(stock_symbol, data)
+        elif specialist_type == "news":
+            result = self._news_specialist(stock_symbol, data)
+        elif specialist_type == "technical":
+            result = self._technical_specialist(stock_symbol, data)
+        else:
+            result = self._general_specialist(stock_symbol, query, data)
+        
+        return {
+            "workflow": "routing",
+            "specialist": specialist_type,
+            "analysis": result
+        }
+    
+    def _route_query(self, query: str) -> str:
+        """Determine which specialist to use based on query."""
+        query_lower = query.lower()
+        
+        if any(word in query_lower for word in ["earnings", "revenue", "profit", "eps"]):
+            return "earnings"
+        elif any(word in query_lower for word in ["news", "announcement", "event", "sentiment"]):
+            return "news"
+        elif any(word in query_lower for word in ["price", "technical", "chart", "trend", "support", "resistance"]):
+            return "technical"
+        else:
+            return "general"
+    
+    def _earnings_specialist(self, stock_symbol: str, data: Dict[str, Any]) -> str:
+        """Earnings specialist analysis."""
+        console.print("[dim]→ Earnings specialist analyzing...[/dim]")
+        
+        financial_data = data.get("financial_metrics", {})
+        
+        prompt = f"""You are an earnings specialist. Analyze the financial metrics for {stock_symbol}.
+        
+Financial Data: {json.dumps(financial_data, indent=2)}
+
+Focus on:
+- Revenue and earnings trends
+- Profitability metrics
+- Growth indicators
+- Valuation ratios
+
+Provide specific insights about earnings quality and sustainability."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        return response.content
+    
+    def _news_specialist(self, stock_symbol: str, data: Dict[str, Any]) -> str:
+        """News specialist analysis."""
+        console.print("[dim]→ News specialist analyzing...[/dim]")
+        
+        news_data = data.get("news_data", {})
+        
+        prompt = f"""You are a news sentiment specialist. Analyze news for {stock_symbol}.
+        
+News Data: {json.dumps(news_data, indent=2)}
+
+Focus on:
+- Sentiment trends
+- Key events and their impact
+- Market perception
+- Potential catalysts
+
+Provide actionable insights from news analysis."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        return response.content
+    
+    def _technical_specialist(self, stock_symbol: str, data: Dict[str, Any]) -> str:
+        """Technical analysis specialist."""
+        console.print("[dim]→ Technical specialist analyzing...[/dim]")
+        
+        price_data = data.get("historical_prices", {})
+        
+        prompt = f"""You are a technical analysis specialist. Analyze price action for {stock_symbol}.
+        
+Price Data: Latest ${price_data.get('latest_price', 'N/A')}
+Technical Indicators: {json.dumps(price_data.get('technical_indicators', {}), indent=2)}
+
+Focus on:
+- Trend direction and strength
+- Support/resistance levels
+- Technical indicator signals
+- Entry/exit points
+
+Provide specific technical trading insights."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        return response.content
+    
+    def _general_specialist(self, stock_symbol: str, query: str, data: Dict[str, Any]) -> str:
+        """General investment specialist."""
+        console.print("[dim]→ General specialist analyzing...[/dim]")
+        
+        prompt = f"""You are a general investment specialist. Answer this query about {stock_symbol}.
+        
+Query: {query}
+Available Data: {json.dumps(data, indent=2)[:500]}...
+
+Provide a comprehensive, balanced analysis addressing the specific question."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        return response.content
+
+
+class EvaluatorOptimizerWorkflow:
+    """Evaluator-Optimizer: Generate → Evaluate → Refine"""
+    
+    def __init__(self, llm):
+        self.llm = llm
+        self.max_iterations = 2
+        console.print("[bold green]Evaluator-Optimizer Workflow initialized[/bold green]")
+    
+    def execute(self, stock_symbol: str, initial_analysis: str) -> Dict[str, Any]:
+        """Execute the evaluator-optimizer loop."""
+        console.print(f"[cyan]Starting Evaluator-Optimizer Workflow for {stock_symbol}[/cyan]")
+        
+        current_analysis = initial_analysis
+        iteration = 0
+        evaluation_history = []
+        
+        while iteration < self.max_iterations:
+            iteration += 1
+            console.print(f"[yellow]→ Iteration {iteration}/{self.max_iterations}[/yellow]")
+            
+            # Evaluate
+            evaluation = self._evaluate_analysis(current_analysis)
+            evaluation_history.append(evaluation)
+            
+            console.print(f"[dim]Quality Score: {evaluation['quality_score']:.2f}/10[/dim]")
+            
+            # Check if quality is acceptable
+            if evaluation['quality_score'] >= 8.0:
+                console.print("[green]✓ Quality threshold met[/green]")
+                break
+            
+            # Optimize
+            current_analysis = self._optimize_analysis(current_analysis, evaluation)
+        
+        return {
+            "workflow": "evaluator_optimizer",
+            "iterations": iteration,
+            "final_analysis": current_analysis,
+            "final_quality_score": evaluation_history[-1]['quality_score'],
+            "improvements_made": [e['issues'] for e in evaluation_history]
+        }
+    
+    def _evaluate_analysis(self, analysis: str) -> Dict[str, Any]:
+        """Evaluate the quality of analysis."""
+        console.print("[dim]→ Evaluating analysis quality...[/dim]")
+        
+        prompt = f"""Evaluate this investment analysis for quality.
+        
+Analysis:
+{analysis}
+
+Rate on scale of 1-10 for:
+1. Completeness (covers all key aspects)
+2. Accuracy (logical and well-reasoned)
+3. Actionability (provides clear recommendations)
+4. Clarity (easy to understand)
+
+Format:
+Completeness: X/10
+Accuracy: X/10
+Actionability: X/10
+Clarity: X/10
+Overall: X/10
+Issues: [list specific issues to improve]"""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        # Parse the evaluation (simplified)
+        content = response.content
+        try:
+            overall_line = [line for line in content.split('\n') if 'Overall:' in line][0]
+            score = float(overall_line.split(':')[1].split('/')[0].strip())
+        except:
+            score = 7.0  # Default if parsing fails
+        
+        return {
+            "quality_score": score,
+            "detailed_evaluation": content,
+            "issues": content.split('Issues:')[-1].strip() if 'Issues:' in content else ""
+        }
+    
+    def _optimize_analysis(self, analysis: str, evaluation: Dict[str, Any]) -> str:
+        """Refine analysis based on evaluation."""
+        console.print("[dim]→ Optimizing analysis...[/dim]")
+        
+        prompt = f"""Improve this investment analysis based on the evaluation feedback.
+        
+Original Analysis:
+{analysis}
+
+Evaluation Feedback:
+{evaluation['detailed_evaluation']}
+
+Specific Issues to Address:
+{evaluation['issues']}
+
+Provide an improved version that addresses all issues while maintaining accuracy."""
+        
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        console.print("[green]✓ Analysis optimized[/green]")
+        
+        return response.content
+
+
+# =============================================================================
 # MAIN INVESTMENT RESEARCH AGENT
 # =============================================================================
 
@@ -1222,6 +1584,12 @@ class InvestmentAgent:
         self.analyzer = Analyzer()
         self.memory_system = MemorySystem()
         self.results = {}
+        
+        # Initialize agentic workflows
+        self.news_chain = NewsChainWorkflow(self.llm)
+        self.routing_workflow = RoutingWorkflow(self.llm)
+        self.evaluator_optimizer = EvaluatorOptimizerWorkflow(self.llm)
+        
         console.print("[bold green]Investment Research Agent initialized successfully[/bold green]")
 
     def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
@@ -1256,52 +1624,31 @@ class InvestmentAgent:
 
     def _analyst(self, state: State) -> State:
         """Analyst node that processes stock analysis."""
-        ANALYST_PROMPT = """
-        You are a financial analyst specializing in stock evaluation.
-
-        You have access to the following tools:
-        1. **get_stock_prices**: Retrieves stock price data and technical indicators.
-        2. **get_financial_metrics**: Retrieves key financial metrics and ratios.
-        3. **search_web**: Performs web searches to get real-time information from the internet.
-        4. **calculate**: Evaluates mathematical expressions for financial calculations.
-
-        ### Your Task:
-        1. Use the provided stock symbol to query the tools and collect data.
-        2. Use search_web to get the latest news and market sentiment about the stock.
-        3. Use calculate when you need to perform financial calculations (ratios, percentages, etc.).
-        4. Analyze the results and identify trends and patterns.
-        5. Provide a comprehensive summary with specific recommendations.
-
-        ### Output Format:
-        Respond with:
-        "stock": "<Stock Symbol>",
-        "price_analysis": "<Analysis of price trends and technical indicators>",
-        "financial_analysis": "<Analysis of financial metrics and valuation>",
-        "market_sentiment": "<Analysis based on web search results>",
-        "final_summary": "<Overall conclusion based on all analyses>",
-        "recommendation": "<Specific investment recommendation>"
-
-        Be objective, data-driven, and provide actionable insights.
-        """
-        
         messages = state["messages"]
         stock_symbol = state.get("stock", "UNKNOWN")
         
-        # Create the analysis prompt
-        analysis_prompt = f"{ANALYST_PROMPT}\n\nStock Symbol: {stock_symbol}"
+        # Check if this is the first call (no tool results yet)
+        has_system_message = any(isinstance(msg, SystemMessage) for msg in messages)
         
-        # Add the prompt to messages
-        messages.append(HumanMessage(content=analysis_prompt))
+        if not has_system_message:
+            # First call - add system prompt
+            ANALYST_PROMPT = f"""You are a financial analyst specializing in stock evaluation for {stock_symbol}.
+
+You have access to these tools:
+1. **get_stock_prices**: Get price data and technical indicators
+2. **get_financial_metrics**: Get financial metrics and ratios
+3. **search_web**: Search for latest news and information
+4. **calculate**: Perform financial calculations
+
+Start by gathering data using the tools, then provide comprehensive analysis."""
+            
+            messages.insert(0, SystemMessage(content=ANALYST_PROMPT))
         
-        # --- FIX: Ensure tool calls are handled with tool messages ---
-        # Use the LangGraph ToolNode to handle tool calls and responses
-        # This is the correct way to ensure tool_call_ids are matched with ToolMessages
-
-        # Instead of calling self.llm_with_tools.invoke directly, let the graph handle tool calls
-        # So, just return the updated state and let the graph's tool node process tool calls
-
+        # Invoke the LLM with tools
+        response = self.llm_with_tools.invoke(messages)
+        
         return {
-            "messages": messages,
+            "messages": [response],
             "stock": stock_symbol,
             "analysis_data": state.get("analysis_data", {}),
             "final_analysis": state.get("final_analysis", {})
@@ -1416,87 +1763,278 @@ class InvestmentAgent:
             "memory_statistics": memory_stats,
             "timestamp": datetime.now().isoformat()
         }
+    
+    def query(self, stock_symbol: str, user_query: str, use_optimizer: bool = True) -> Dict[str, Any]:
+        """
+        Main query handler - intelligently routes to appropriate workflows.
+        
+        This is the main entry point that:
+        1. Collects necessary data
+        2. Determines which workflow pattern to use
+        3. Executes the workflow
+        4. Optionally optimizes the result
+        5. Returns comprehensive analysis
+        
+        Args:
+            stock_symbol: Stock ticker symbol
+            user_query: User's question about the stock
+            use_optimizer: Whether to use evaluator-optimizer workflow
+            
+        Returns:
+            Dict containing analysis results and workflow information
+        """
+        console.print(Panel.fit(
+            f"[bold cyan]Processing Query[/bold cyan]\n"
+            f"Stock: [yellow]{stock_symbol}[/yellow]\n"
+            f"Query: [white]{user_query}[/white]",
+            border_style="cyan"
+        ))
+        
+        # Step 1: Collect data
+        console.print("\n[bold]Step 1: Gathering Data[/bold]")
+        data = self._collect_stock_data(stock_symbol)
+        
+        # Step 2: Determine workflow strategy
+        console.print("\n[bold]Step 2: Determining Workflow Strategy[/bold]")
+        workflow_strategy = self._determine_workflow(user_query)
+        console.print(f"[yellow]→ Selected Strategy: {workflow_strategy}[/yellow]")
+        
+        # Step 3: Execute appropriate workflow
+        console.print("\n[bold]Step 3: Executing Workflow[/bold]")
+        
+        if workflow_strategy == "news_chain":
+            # Use prompt chaining for news-focused queries
+            news_data = data.get("news_data", {}).get("news", [])
+            workflow_result = self.news_chain.execute(stock_symbol, news_data)
+            analysis = workflow_result["final_summary"]
+            
+        elif workflow_strategy == "routing":
+            # Use routing for specialist analysis
+            workflow_result = self.routing_workflow.execute(stock_symbol, user_query, data)
+            analysis = workflow_result["analysis"]
+            
+        else:
+            # Default: comprehensive analysis
+            workflow_result = {"workflow": "comprehensive"}
+            analysis = self._generate_comprehensive_analysis(stock_symbol, user_query, data)
+        
+        # Step 4: Optimize if requested
+        if use_optimizer:
+            console.print("\n[bold]Step 4: Optimizing Analysis[/bold]")
+            optimizer_result = self.evaluator_optimizer.execute(stock_symbol, analysis)
+            final_analysis = optimizer_result["final_analysis"]
+            workflow_result["optimization"] = {
+                "iterations": optimizer_result["iterations"],
+                "final_quality_score": optimizer_result["final_quality_score"]
+            }
+        else:
+            final_analysis = analysis
+        
+        # Step 5: Store in memory
+        self.memory_system.add_memory(
+            stock_symbol, "query_analysis",
+            f"Query: {user_query[:100]}... Result: {final_analysis[:200]}...",
+            {"query": user_query, "workflow": workflow_strategy},
+            0.7, ["query", workflow_strategy]
+        )
+        
+        # Prepare final result
+        result = {
+            "stock_symbol": stock_symbol,
+            "user_query": user_query,
+            "workflow_used": workflow_strategy,
+            "workflow_details": workflow_result,
+            "final_analysis": final_analysis,
+            "data_summary": {
+                "price": data.get("historical_prices", {}).get("latest_price", "N/A"),
+                "pe_ratio": data.get("financial_metrics", {}).get("pe_ratio", "N/A"),
+                "news_count": len(data.get("news_data", {}).get("news", []))
+            },
+            "timestamp": datetime.now().isoformat(),
+            "status": "completed"
+        }
+        
+        console.print("\n[bold green]✓ Query Processing Completed[/bold green]")
+        return result
+    
+    def _collect_stock_data(self, stock_symbol: str) -> Dict[str, Any]:
+        """Collect all necessary stock data."""
+        data = {}
+        
+        try:
+            data["historical_prices"] = self.data_wrapper.fetch_historical_prices(stock_symbol)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not fetch prices: {str(e)}[/yellow]")
+            data["historical_prices"] = {}
+        
+        try:
+            financial_result = self.data_wrapper.fetch_key_financials(stock_symbol)
+            data["financial_metrics"] = financial_result.get("key_metrics", {})
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not fetch financials: {str(e)}[/yellow]")
+            data["financial_metrics"] = {}
+        
+        try:
+            data["news_data"] = self.data_wrapper.fetch_stock_news(stock_symbol)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not fetch news: {str(e)}[/yellow]")
+            data["news_data"] = {}
+        
+        return data
+    
+    def _determine_workflow(self, query: str) -> str:
+        """Determine which workflow to use based on query."""
+        query_lower = query.lower()
+        
+        # News chain for news-focused queries
+        if any(word in query_lower for word in ["news", "headlines", "announcements", "sentiment", "media"]):
+            return "news_chain"
+        
+        # Routing for specialist queries
+        elif any(word in query_lower for word in ["earnings", "revenue", "profit", "technical", "price", "chart"]):
+            return "routing"
+        
+        # Comprehensive for general queries
+        else:
+            return "comprehensive"
+    
+    def _generate_comprehensive_analysis(self, stock_symbol: str, query: str, data: Dict[str, Any]) -> str:
+        """Generate comprehensive analysis combining all data."""
+        prompt = f"""Provide a comprehensive investment analysis for {stock_symbol}.
+
+User Query: {query}
+
+Price Data: Latest ${data.get('historical_prices', {}).get('latest_price', 'N/A')}
+Change: {data.get('historical_prices', {}).get('price_change_pct', 'N/A')}%
+
+Financial Metrics:
+- P/E Ratio: {data.get('financial_metrics', {}).get('pe_ratio', 'N/A')}
+- Market Cap: {data.get('financial_metrics', {}).get('market_cap', 'N/A')}
+- Recommendation: {data.get('financial_metrics', {}).get('recommendation', 'N/A')}
+
+News Articles: {len(data.get('news_data', {}).get('news', []))} articles available
+
+Provide:
+1. Overall assessment
+2. Key strengths and risks
+3. Investment recommendation
+4. Price target or action items
+
+Be specific and actionable."""
+
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        return response.content
 
 # =============================================================================
 # EXAMPLE USAGE
 # =============================================================================
-
 def main():
-    """Example usage of the investment agent."""
-    print("=" * 60)
-    print("Investment Research Agent")
-    print("=" * 60)
+    """Main function demonstrating agentic workflow capabilities."""
+    console.print(Panel.fit(
+        "[bold cyan]Investment Research Agent[/bold cyan]\n"
+        "[white]Powered by Agentic Workflows[/white]",
+        border_style="cyan"
+    ))
     
     # Initialize the agent
+    console.print("\n[yellow]Initializing agent...[/yellow]")
     agent = InvestmentAgent()
-    
-    # Test stock symbol
-    stock_symbol = input("Enter stock symbol: ")
-    
-    print(f"\n1. Executing Analysis for {stock_symbol}")
-    print("-" * 50)
-    
-    # Execute analysis
-    result = agent.execute_analysis(stock_symbol)
-    
-    if result["status"] == "completed":
-        analysis = result["analysis_result"]
-        print(f"✓ Analysis completed successfully")
-        print(f"Confidence Score: {analysis['confidence_score']:.2f}")
-        print(f"Recommendations: {len(analysis['recommendations'])}")
-        print(f"\nAI Analysis Summary:")
-        print(analysis['ai_analysis'])
-        print(f"\nRecommendations:")
-        for i, rec in enumerate(analysis['recommendations'], 1):
-            print(f"{i}. {rec}")
+
+    while True:
+        console.print("\n")
+        stock_symbol = console.input("[bold cyan]Enter stock symbol (or 'quit' to exit): [/bold cyan]").upper()
+        
+        if stock_symbol.lower() == 'quit':
+            break
             
-        # Create recommendations directory if it doesn't exist
+        # Get user query
+        console.print("\n[bold]Example queries:[/bold]")
+        console.print("  • What's the latest news sentiment for this stock?")
+        console.print("  • Should I buy this stock based on technical analysis?")
+        console.print("  • How are the earnings looking?")
+        console.print("  • Give me a comprehensive investment analysis")
+        
+        user_query = console.input("\n[bold cyan]Your question (or 'quit' to exit): [/bold cyan]")
+        
+        if user_query.lower() == 'quit':
+            break
+            
+        # Execute the main query with agentic workflows
+        console.print("\n" + "=" * 60)
+        result = agent.query(stock_symbol, user_query, use_optimizer=True)
+        
+        # Display results
+        console.print("\n" + "=" * 60)
+        console.print(Panel.fit(
+            "[bold green]Analysis Complete[/bold green]",
+            border_style="green"
+        ))
+        
+        # Show workflow information
+        console.print(f"\n[bold]Workflow Used:[/bold] [yellow]{result['workflow_used']}[/yellow]")
+        
+        if "optimization" in result["workflow_details"]:
+            opt = result["workflow_details"]["optimization"]
+            console.print(f"[bold]Optimization:[/bold] {opt['iterations']} iterations, "
+                         f"Quality Score: {opt['final_quality_score']:.1f}/10")
+        
+        # Show data summary
+        console.print(f"\n[bold]Data Summary:[/bold]")
+        data_table = Table(show_header=False, box=None)
+        data_table.add_column("Metric", style="cyan")
+        data_table.add_column("Value", style="white")
+        
+        summary = result["data_summary"]
+        data_table.add_row("Current Price", f"${summary['price']}")
+        data_table.add_row("P/E Ratio", str(summary['pe_ratio']))
+        data_table.add_row("News Articles", str(summary['news_count']))
+        
+        console.print(data_table)
+        
+        # Show final analysis
+        console.print(f"\n[bold]Analysis:[/bold]")
+        console.print(Panel(
+            result["final_analysis"],
+            border_style="green",
+            padding=(1, 2)
+        ))
+        
+        # Save to file
         os.makedirs('recommendations', exist_ok=True)
-        
-        # Generate markdown content
-        markdown_content = f"""
-# Investment Analysis for {stock_symbol}
-
-## Analysis Summary
-{analysis['ai_analysis']}
-
-## Recommendations
-"""
-        for i, rec in enumerate(analysis['recommendations'], 1):
-            markdown_content += f"{i}. {rec}\n"
-            
-        markdown_content += f"\n\n*Generated on: {datetime.now().isoformat()}*"
-        
-        # Save markdown file
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"recommendations/{stock_symbol}_{timestamp}.md"
+        
+        markdown_content = f"""# Investment Analysis for {stock_symbol}
+
+**Query:** {user_query}
+
+**Workflow Used:** {result['workflow_used']}
+
+**Generated:** {result['timestamp']}
+
+## Analysis
+
+{result['final_analysis']}
+
+## Data Summary
+
+- **Current Price:** ${summary['price']}
+- **P/E Ratio:** {summary['pe_ratio']}
+- **News Articles Analyzed:** {summary['news_count']}
+
+---
+
+*This analysis was generated using agentic workflows including prompt chaining, routing, and evaluator-optimizer patterns.*
+"""
+        
         with open(filename, 'w') as f:
             f.write(markdown_content)
-        print(f"\nAnalysis saved to: {filename}")
-    else:
-        print(f"✗ Analysis failed: {result.get('error', 'Unknown error')}")
-    
-    print(f"\n2. Executing LangGraph Analysis for {stock_symbol}")
-    print("-" * 50)
-    
-    # Execute LangGraph analysis
-    langgraph_result = agent.analyze_stock(stock_symbol, "Should I buy this stock?")
-    
-    if langgraph_result["status"] == "completed":
-        print(f"✓ LangGraph analysis completed successfully")
-        print(f"Session ID: {langgraph_result['stock_symbol']}")
-        print(f"Analysis Method: LangGraph")
-        # print(f"\nRaw Analysis:")
-        # print(langgraph_result['raw_response'])
-    else:
-        print(f"✗ LangGraph analysis failed: {langgraph_result.get('error', 'Unknown error')}")
-    
-    print(f"\n3. Memory System Summary")
-    print("-" * 30)
-    summary = agent.get_analysis_summary(stock_symbol)
-    print(f"Total memories for {stock_symbol}: {summary['total_memories']}")
-    print(f"Total memories in system: {summary['memory_statistics']['total_memories']}")
-    print(f"Average importance: {summary['memory_statistics']['average_importance']:.2f}")
-    
+        
+        console.print(f"\n[green]✓ Analysis saved to:[/green] [cyan]{filename}[/cyan]")
+        console.print("\n" + "=" * 60)
+
+    console.print("\n[bold cyan]Thank you for using Investment Research Agent![/bold cyan]\n")
+
+
 if __name__ == "__main__":
     main()

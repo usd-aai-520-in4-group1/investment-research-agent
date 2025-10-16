@@ -2,39 +2,52 @@
 
 A sophisticated AI-powered investment research system that combines LangGraph workflows, OpenAI's GPT models, and comprehensive financial data analysis to provide intelligent stock recommendations.
 
-## 🚀 Overview
+## Overview
 
 This project is a complete investment research platform that leverages cutting-edge AI technology to analyze stocks comprehensively. It combines traditional financial analysis with modern AI capabilities to deliver actionable investment insights.
 
 ### Key Features
 
-- **🤖 AI-Powered Analysis**: Uses OpenAI's GPT-4o-mini for intelligent financial analysis
-- **📊 Comprehensive Data**: Integrates Yahoo Finance data with 20+ technical indicators
-- **🔄 LangGraph Workflows**: Advanced workflow orchestration for complex analysis chains
-- **🧠 Learning Memory**: Persistent memory system that learns from past analyses
-- **📈 Technical Analysis**: Real-time calculation of RSI, MACD, SMA, and other indicators
-- **📰 News Integration**: Sentiment analysis of recent news and market impact
-- **🎨 Rich Visualization**: Beautiful console output with progress bars and formatted tables
-- **⚡ Dual Analysis Modes**: Both LangGraph-based and traditional analysis workflows
+- **AI-Powered Analysis**: Uses OpenAI's GPT-4o-mini for intelligent financial analysis
+- **Agentic Workflows**: Three powerful workflow patterns for intelligent routing and optimization
+  - **Prompt Chaining**: 5-step pipeline (Ingest → Preprocess → Classify → Extract → Summarize) for news analysis
+  - **Routing**: Automatic routing to specialist analyzers (Earnings, Technical, News, General)
+  - **Evaluator-Optimizer**: Iterative quality refinement for high-quality analysis
+- **Comprehensive Data**: Integrates Yahoo Finance data with 20+ technical indicators
+- **LangGraph Workflows**: Advanced workflow orchestration for complex analysis chains
+- **Learning Memory**: Persistent memory system that learns from past analyses
+- **Technical Analysis**: Real-time calculation of RSI, MACD, SMA, and other indicators
+- **News Integration**: Sentiment analysis of recent news and market impact
+- **Rich Visualization**: Beautiful console output with progress bars and formatted tables
+- **Intelligent Query Handler**: Single entry point that automatically selects the best workflow
 
-## 🏗️ Architecture
+## Architecture
 
 The system is built with a modular architecture that separates concerns and enables easy extension:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Investment Research Agent                    │
-├─────────────────────────────────────────────────────────────────┤
-│  Core Components:                                               │
-│  ├── InvestmentAgent      (Main Agent Class)              │
-│  ├── YahooFinanceDataWrapper     (Data Collection)             │
-│  ├── Analyzer             (AI Analysis Engine)            │
-│  ├── MemorySystem         (Learning & Memory)            │
-│  └── LangGraph Integration      (Workflow Orchestration)       │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                   Investment Research Agent                      │
+├──────────────────────────────────────────────────────────────────┤
+│  Main Query Interface:                                           │
+│  └── agent.query() → Intelligent Workflow Routing               │
+│                                                                   │
+│  Agentic Workflows:                                              │
+│  ├── NewsChainWorkflow        (Prompt Chaining)                 │
+│  ├── RoutingWorkflow          (Specialist Routing)              │
+│  └── EvaluatorOptimizer       (Quality Refinement)              │
+│                                                                   │
+│  Core Components:                                                │
+│  ├── InvestmentAgent          (Main Orchestrator)               │
+│  ├── YahooFinanceDataWrapper  (Data Collection)                 │
+│  ├── WebToolsWrapper          (Web Search & Calculator)         │
+│  ├── Analyzer                 (AI Analysis Engine)              │
+│  ├── MemorySystem             (Learning & Memory)               │
+│  └── LangGraph Integration    (Tool Orchestration)              │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before running the project, ensure you have:
 
@@ -63,7 +76,7 @@ Before running the project, ensure you have:
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Basic Usage (Recommended)
 
 ```python
 from investment_agent import InvestmentAgent
@@ -71,22 +84,47 @@ from investment_agent import InvestmentAgent
 # Initialize the agent
 agent = InvestmentAgent()
 
-# Analyze a stock using  analysis
-result = agent.execute_analysis("META")
+# Ask any question - the agent automatically selects the best workflow
+result = agent.query(
+    stock_symbol="AAPL",
+    user_query="Should I buy this stock?",
+    use_optimizer=True  # Enable quality optimization
+)
 
-# Analyze using LangGraph workflow
-langgraph_result = agent.analyze_stock("META", "Should I buy META stock?")
+# Access the analysis
+print(f"Workflow used: {result['workflow_used']}")
+print(f"Analysis: {result['final_analysis']}")
+```
+
+### Different Query Examples
+
+```python
+# News sentiment analysis (uses Prompt Chaining workflow)
+result = agent.query("TSLA", "What's the latest news sentiment?")
+
+# Technical analysis (routes to Technical Specialist)
+result = agent.query("NVDA", "What's the price trend?")
+
+# Earnings analysis (routes to Earnings Specialist)
+result = agent.query("META", "How are the earnings?")
+
+# Comprehensive analysis (uses Evaluator-Optimizer)
+result = agent.query("GOOGL", "Is this a good investment?")
 ```
 
 ### Running the Example
 
 ```bash
+# Interactive mode with workflow demonstrations
 python investment_agent.py
+
+# Or run specific examples
+python test_agentic_usage.py
 ```
 
-This will run a complete analysis example for META stock, demonstrating both analysis modes.
+This will prompt you for a stock symbol and query, then automatically select and execute the appropriate workflow.
 
-## 📊 Data Sources & Analysis
+## Data Sources & Analysis
 
 ### Financial Data Integration
 
@@ -115,6 +153,82 @@ The AI-powered analyzer provides:
 - **News Sentiment**: Impact analysis of recent news
 - **Investment Recommendations**: Specific buy/hold/sell recommendations
 - **Confidence Scoring**: Analysis reliability assessment
+
+## 🤖 Agentic Workflow Patterns
+
+The agent implements three sophisticated workflow patterns that work together to provide intelligent, high-quality analysis:
+
+### 1. Prompt Chaining (News Analysis)
+
+**Pattern**: Ingest → Preprocess → Classify → Extract → Summarize
+
+A 5-step pipeline for systematic news analysis:
+
+```
+Step 1: Ingest       → Collect raw news articles
+Step 2: Preprocess   → Clean and structure data
+Step 3: Classify     → Categorize by topic and sentiment
+Step 4: Extract      → Pull key points and insights
+Step 5: Summarize    → Create executive summary
+```
+
+**Triggered by**: Queries about news, headlines, announcements, sentiment
+
+### 2. Routing (Specialist Analysis)
+
+**Pattern**: Query → Intelligent Router → Specialist → Expert Analysis
+
+Routes queries to the most appropriate specialist:
+
+- **Earnings Specialist**: Revenue, profit, EPS, financial metrics
+- **Technical Specialist**: Price trends, charts, indicators
+- **News Specialist**: Sentiment, events, market perception
+- **General Specialist**: Comprehensive balanced analysis
+
+**Triggered by**: Specific keywords like "earnings", "price", "technical", etc.
+
+### 3. Evaluator-Optimizer (Quality Refinement)
+
+**Pattern**: Generate → Evaluate → Refine → Repeat
+
+Iteratively improves analysis quality:
+
+```
+Iteration 1: Generate initial analysis → Evaluate quality
+             If score < 8.0 → Identify issues → Refine
+
+Iteration 2: Generate improved analysis → Evaluate quality
+             If score ≥ 8.0 → Return final result
+```
+
+**Quality Metrics**: Completeness, Accuracy, Actionability, Clarity
+
+**Always active** when `use_optimizer=True` (recommended for important decisions)
+
+### How Workflow Selection Works
+
+The agent automatically selects the best workflow based on your query:
+
+| Query Keywords | Workflow | Specialist (if routing) |
+|----------------|----------|------------------------|
+| news, headlines, sentiment | Prompt Chaining | - |
+| earnings, revenue, profit | Routing | Earnings |
+| price, technical, chart | Routing | Technical |
+| general questions | Comprehensive | General |
+
+**Example**:
+```python
+# Automatically uses News Chain workflow
+agent.query("AAPL", "What's the news sentiment?")
+
+# Automatically routes to Earnings Specialist
+agent.query("TSLA", "How are earnings looking?")
+
+# Automatically uses comprehensive analysis + optimizer
+agent.query("GOOGL", "Should I invest?")
+```
+
+For more details, see [agentic_workflows.md](agentic_workflows.md)
 
 ## 🔧 Core Components
 
@@ -254,7 +368,7 @@ The system provides rich console output with:
 - Formatted tables and panels
 - Real-time analysis updates
 
-## 🧠 Memory System
+## Memory System
 
 The learning memory system enables the agent to:
 
@@ -283,16 +397,40 @@ OPENKEY=your_openai_api_key
 ```
 
 
-## 🎯 Key Technical Achievements
+## Key Technical Achievements
 
 This project showcases several advanced technical concepts:
 
-1. **LangGraph Integration**: Advanced workflow orchestration with state management
-2. **AI-Powered Analysis**: Sophisticated prompt engineering and response parsing
-3. **Technical Analysis**: Real-time calculation of complex financial indicators
-4. **Memory Systems**: Persistent learning and pattern recognition
-5. **Rich Visualization**: Professional console output with progress tracking
-6. **Error Resilience**: Comprehensive error handling and graceful degradation
-7. **Modular Architecture**: Clean separation of concerns and extensible design
+1. **Agentic Workflow Patterns**: Implementation of three sophisticated patterns:
+   - **Prompt Chaining**: Multi-step pipeline for systematic processing
+   - **Routing**: Intelligent query routing to specialized analyzers
+   - **Evaluator-Optimizer**: Iterative quality refinement loop
+2. **Intelligent Query Understanding**: Automatic workflow selection based on query analysis
+3. **LangGraph Integration**: Advanced workflow orchestration with state management and tool calling
+4. **AI-Powered Analysis**: Sophisticated prompt engineering and response parsing
+5. **Technical Analysis**: Real-time calculation of 20+ complex financial indicators
+6. **Memory Systems**: Persistent learning and pattern recognition with importance scoring
+7. **Rich Visualization**: Professional console output with progress tracking and panels
+8. **Error Resilience**: Comprehensive error handling and graceful degradation
+9. **Modular Architecture**: Clean separation of concerns and extensible design
+10. **Quality Assurance**: Self-evaluating system with iterative improvement
 
-The codebase demonstrates production-ready patterns for AI applications in financial analysis, making it an excellent reference for similar projects.
+The codebase demonstrates production-ready patterns for agentic AI applications in financial analysis, making it an excellent reference for similar projects.
+
+## Additional Resources
+
+- **[agentic_workflows.md](agentic_workflows.md)** - Detailed documentation on workflow patterns
+- **[test_agentic_usage.py](test_agentic_usage.py)** - 8 examples demonstrating different workflows
+- **[investment_agent.py](investment_agent.py)** - Main implementation (2000+ lines)
+
+## Contributing
+
+This is a comprehensive test of agentic AI patterns. Feel free to extend it with:
+- Additional specialist analyzers
+- New workflow patterns (e.g., ReAct, Tree of Thoughts)
+- More data sources (Alpha Vantage, etc.)
+- Enhanced memory features (vector storage, semantic search)
+
+## License
+
+This project is provided as-is for educational and research purposes.

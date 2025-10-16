@@ -90,7 +90,112 @@
       "tags": [
         "high_confidence"
       ]
+    },
+    {
+      "timestamp": "2025-10-16T18:30:34.235862",
+      "stock_symbol": "META",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the latest news sentiment for this stock?... Result: **Improved Investment Analysis:**\n\n**Executive Summary:**\n\nRecent analyses show significant shifts in revenue projections and profit margins within the technology sector, particularly influenced by ne...",
+      "context": {
+        "query": "What's the latest news sentiment for this stock?",
+        "workflow": "news_chain"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "news_chain"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:32:00.380000",
+      "stock_symbol": "META",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the latest news sentiment for META?... Result: ### Executive Summary\n\nThis executive summary serves as a framework for evaluating classified articles with a focus on critical financial and market insights. By utilizing the provided template, stake...",
+      "context": {
+        "query": "What's the latest news sentiment for META?",
+        "workflow": "news_chain"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "news_chain"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:32:14.678761",
+      "stock_symbol": "META",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the technical analysis for META?... Result: ### Technical Analysis for META\n\n#### Current Price Data\n- **Latest Price**: $717.55\n\n#### 1. Trend Direction and Strength\n- **Current Trend**: The current price is below the 20-period Simple Moving A...",
+      "context": {
+        "query": "What's the technical analysis for META?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:32:30.737661",
+      "stock_symbol": "META",
+      "memory_type": "query_analysis",
+      "content": "Query: How are the earnings for META?... Result: ### Financial Analysis of Meta Platforms, Inc. (Symbol: META)\n\n**1. Revenue and Earnings Trends:**\n   - **Market Capitalization**: At approximately $1.8 trillion, META is one of the largest companies ...",
+      "context": {
+        "query": "How are the earnings for META?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:37:45.653933",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: How are the earnings looking?... Result: ### Investment Analysis of Alphabet Inc. (GOOG)\n\nAnalyzing the financial metrics for Alphabet Inc. (GOOG), we can derive valuable insights across revenue and earnings trends, profitability metrics, gr...",
+      "context": {
+        "query": "How are the earnings looking?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:39:35.480715",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I buy this stock based on technical analysis?... Result: Here's an analysis of Alphabet Inc. (GOOG) based on the provided price action and technical indicators.\n\n### 1. **Trend Direction and Strength**\n- **Current Price**: $251.71, which is above the 20-day...",
+      "context": {
+        "query": "Should I buy this stock based on technical analysis?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-16T18:44:39.964931",
+      "stock_symbol": "META",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I buy this stock based on technical analysis?... Result: ### Price Action Analysis for META\n\n#### Current Price:\n- **Latest Price**: $717.55\n\n### Trend Direction and Strength:\n- **Current Price vs SMA**: The price is currently below the 20-day Simple Moving...",
+      "context": {
+        "query": "Should I buy this stock based on technical analysis?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
     }
   ],
-  "last_updated": "2025-10-16T17:53:03.199704"
+  "last_updated": "2025-10-16T18:44:39.965254"
 }
