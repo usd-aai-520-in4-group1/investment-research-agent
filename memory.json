@@ -360,7 +360,82 @@
         "query",
         "comprehensive"
       ]
+    },
+    {
+      "timestamp": "2025-10-18T08:55:53.855067",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the latest updates on Apple stock?... Result: Certainly! Here\u2019s an improved version of the investment analysis that addresses the evaluation feedback, incorporating more quantitative data, specific stock examples, simplified explanations of finan...",
+      "context": {
+        "query": "What's the latest updates on Apple stock?",
+        "workflow": "news_chain"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "news_chain"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:56:09.730951",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I invest in Apple?... Result: ### Investment Analysis for Alphabet Inc. (GOOG)\n\n#### 1. Overall Assessment\nAlphabet Inc. (GOOG) represents a robust investment opportunity within the technology and communications sector. With its m...",
+      "context": {
+        "query": "Should I invest in Apple?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:56:22.730813",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: Tell me about Apple's performance... Result: ### Investment Analysis for Alphabet Inc. (GOOG)\n\n#### 1. Overall Assessment\nAlphabet Inc. (GOOG), the parent company of Google, has maintained strong financial stability and growth potential. The com...",
+      "context": {
+        "query": "Tell me about Apple's performance",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:56:39.424680",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: Is Apple a good buy right now?... Result: ### Investment Analysis for Alphabet Inc. (GOOG)\n\n#### 1. Overall Assessment\nAlphabet Inc. (GOOG) is a leading player in the tech sector, primarily known for its search engine and advertising revenue ...",
+      "context": {
+        "query": "Is Apple a good buy right now?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:57:19.053048",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the technical analysis for AAPL?... Result: ### Enhanced Investment Analysis for Alphabet Inc. (GOOG)\n\nTo analyze the price action for Alphabet Inc. (GOOG), we will explore key technical sections: trend direction and strength, support/resistanc...",
+      "context": {
+        "query": "What's the technical analysis for AAPL?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
     }
   ],
-  "last_updated": "2025-10-18T08:41:17.297141"
+  "last_updated": "2025-10-18T08:57:19.053324"
 }
