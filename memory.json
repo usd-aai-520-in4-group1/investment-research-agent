@@ -210,7 +210,157 @@
         "query",
         "routing"
       ]
+    },
+    {
+      "timestamp": "2025-10-18T08:01:14.156625",
+      "stock_symbol": "AAPL",
+      "memory_type": "query_analysis",
+      "content": "Query: Should i buy apple stock?... Result: When considering whether to buy Apple Inc. (AAPL) stock, it's important to evaluate it from multiple dimensions, including its historical performance, fundamentals, market trends, and external factors...",
+      "context": {
+        "query": "Should i buy apple stock?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:02:59.604056",
+      "stock_symbol": "AAPL",
+      "memory_type": "query_analysis",
+      "content": "Query: How are apple stock price looking like?... Result: ### AAPL Price Action Analysis (Latest Price: $252.29)\n\n#### 1. Trend Direction and Strength\n- **Current Price**: $252.29 is slightly below the 20-period Simple Moving Average (SMA) of $253.49, indica...",
+      "context": {
+        "query": "How are apple stock price looking like?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:12:49.100863",
+      "stock_symbol": "TSLA",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I invest in Tesla?... Result: ### 1. Overall Assessment\n\nTesla, Inc. (TSLA) continues to be a significant player in the electric vehicle (EV) and renewable energy sectors. As of the latest price of approximately $439.31, the stock...",
+      "context": {
+        "query": "Should I invest in Tesla?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:16:33.581683",
+      "stock_symbol": "NASA",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I invest in NASA?... Result: Based on the information provided, it is important to clarify that NASA (National Aeronautics and Space Administration) is not a publicly traded company, which means it does not have stock prices, P/E...",
+      "context": {
+        "query": "Should I invest in NASA?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:23:30.276851",
+      "stock_symbol": "AAPL",
+      "memory_type": "query_analysis",
+      "content": "Query: What's the latest updates on Apple stock?... Result: ### Investment Analysis\n\n#### Executive Summary\n\nApple's stock performance remains strong, largely driven by its strategic collaboration with NBCUniversal, which aims to enhance the content and access...",
+      "context": {
+        "query": "What's the latest updates on Apple stock?",
+        "workflow": "news_chain"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "news_chain"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:24:29.432795",
+      "stock_symbol": "GOOGL",
+      "memory_type": "query_analysis",
+      "content": "Query: Is Google a good buy right now?... Result: ### Investment Analysis for GOOGL (Alphabet Inc.)\n\n#### Overall Assessment\nAs of the latest available price of $253.30, Alphabet Inc. (GOOGL) offers a moderate investment opportunity. The P/E ratio of...",
+      "context": {
+        "query": "Is Google a good buy right now?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:33:05.988804",
+      "stock_symbol": "TSLA",
+      "memory_type": "query_analysis",
+      "content": "Query: Should I invest in Tesla?... Result: When considering whether to invest in Tesla (TSLA), it\u2019s essential to evaluate a range of factors that influence stock performance. Here\u2019s a comprehensive analysis based on the provided data and gener...",
+      "context": {
+        "query": "Should I invest in Tesla?",
+        "workflow": "routing"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "routing"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:36:55.042605",
+      "stock_symbol": "TSLA",
+      "memory_type": "query_analysis",
+      "content": "Query: Should i invest?... Result: ### Investment Analysis for TSLA (Tesla, Inc.)\n\n**Current Stock Price:** $439.31  \n**Change:** +2.46%  \n**P/E Ratio:** 263.06  \n**Market Cap:** $1.46 Trillion  \n**Recommendation:** Hold\n\n#### 1. Overa...",
+      "context": {
+        "query": "Should i invest?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:40:36.439400",
+      "stock_symbol": "AAPL",
+      "memory_type": "query_analysis",
+      "content": "Query: Should i invest in apple?... Result: ### Investment Analysis for Apple Inc. (AAPL)\n\n#### 1. Overall Assessment\nApple Inc. (AAPL) is one of the most prominent companies in the world, known for its innovative technology products and a stro...",
+      "context": {
+        "query": "Should i invest in apple?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
+    },
+    {
+      "timestamp": "2025-10-18T08:41:17.296659",
+      "stock_symbol": "GOOG",
+      "memory_type": "query_analysis",
+      "content": "Query: compare apple vs tesla?... Result: ### Comprehensive Investment Analysis for Alphabet Inc. (GOOG)\n\n#### 1. Overall Assessment\nAlphabet Inc. (GOOG) is a leading technology company with a strong foothold in online advertising, cloud comp...",
+      "context": {
+        "query": "compare apple vs tesla?",
+        "workflow": "comprehensive"
+      },
+      "importance_score": 0.7,
+      "tags": [
+        "query",
+        "comprehensive"
+      ]
     }
   ],
-  "last_updated": "2025-10-16T23:31:59.894807"
+  "last_updated": "2025-10-18T08:41:17.297141"
 }

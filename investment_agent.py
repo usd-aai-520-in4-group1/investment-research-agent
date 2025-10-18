@@ -13,6 +13,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 import requests
 import time
+import random
 
 # Core dependencies
 import pandas as pd
@@ -881,7 +882,7 @@ class WebToolsWrapper:
 
 @tool
 def get_stock_prices(ticker: str) -> Union[Dict, str]:
-    """Fetches historical stock price data and technical indicators."""
+    """Fetches historical stock price data and technical indicators using Yahoo Finance."""
     try:
         wrapper = YahooFinanceDataWrapper()
         result = wrapper.fetch_historical_prices(ticker, period="6mo", interval="1wk")
@@ -900,7 +901,7 @@ def get_stock_prices(ticker: str) -> Union[Dict, str]:
 
 @tool
 def get_financial_metrics(ticker: str) -> Union[Dict, str]:
-    """Fetches key financial ratios and metrics."""
+    """Fetches key financial ratios and metrics using Yahoo Finance."""
     try:
         wrapper = YahooFinanceDataWrapper()
         result = wrapper.fetch_key_financials(ticker)
@@ -917,6 +918,69 @@ def get_financial_metrics(ticker: str) -> Union[Dict, str]:
         }
     except Exception as e:
         return f"Error fetching ratios: {str(e)}"
+
+@tool
+def get_alpha_vantage_quote(ticker: str) -> Union[Dict, str]:
+    """Fetches real-time quote data from Alpha Vantage. Use as alternative to Yahoo Finance."""
+    try:
+        wrapper = AlphaVantageDataWrapper()
+        result = wrapper.fetch_quote(ticker)
+        
+        if "error" in result:
+            return result["error"]
+        
+        return {
+            'symbol': result.get('symbol'),
+            'price': result.get('price'),
+            'change': result.get('change'),
+            'change_percent': result.get('change_percent'),
+            'volume': result.get('volume'),
+            'latest_trading_day': result.get('latest_trading_day')
+        }
+    except Exception as e:
+        return f"Error fetching Alpha Vantage quote: {str(e)}"
+
+@tool
+def get_alpha_vantage_overview(ticker: str) -> Union[Dict, str]:
+    """Fetches comprehensive company overview and fundamentals from Alpha Vantage. Use as alternative to Yahoo Finance."""
+    try:
+        wrapper = AlphaVantageDataWrapper()
+        result = wrapper.fetch_company_overview(ticker)
+        
+        if "error" in result:
+            return result["error"]
+        
+        return {
+            'company_name': result.get('company_name'),
+            'sector': result.get('sector'),
+            'industry': result.get('industry'),
+            'market_cap': result.get('market_cap'),
+            'pe_ratio': result.get('pe_ratio'),
+            'dividend_yield': result.get('dividend_yield'),
+            'beta': result.get('beta'),
+            'profit_margin': result.get('profit_margin'),
+            'analyst_target_price': result.get('analyst_target_price')
+        }
+    except Exception as e:
+        return f"Error fetching Alpha Vantage overview: {str(e)}"
+
+@tool
+def get_alpha_vantage_news(tickers: str) -> Union[Dict, str]:
+    """Fetches market news and sentiment from Alpha Vantage. Use as alternative for news data."""
+    try:
+        wrapper = AlphaVantageDataWrapper()
+        result = wrapper.fetch_market_news_sentiment(tickers=tickers, limit=10)
+        
+        if "error" in result:
+            return result["error"]
+        
+        return {
+            'total_articles': result.get('total_articles', 0),
+            'articles': result.get('articles', [])[:5],  # Return top 5 articles
+            'sentiment_summary': result.get('sentiment_summary', {})
+        }
+    except Exception as e:
+        return f"Error fetching Alpha Vantage news: {str(e)}"
 
 @tool
 def search_web(query: str) -> Union[Dict, str]:
@@ -1179,6 +1243,58 @@ class MemorySystem:
         console.print(f"[green]Retrieved {len(relevant_memories)} memories for {stock_symbol}[/green]")
         return relevant_memories
     
+    def search_memories(self, query: str, limit: int = 5) -> List[MemoryEntry]:
+        """
+        Search memories by query string. Searches through content, context, and tags.
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of memories to return
+            
+        Returns:
+            List of relevant memory entries sorted by relevance and importance
+        """
+        if not self.memories:
+            return []
+        
+        query_lower = query.lower()
+        query_keywords = set(query_lower.split())
+        
+        # Score each memory based on keyword matches
+        scored_memories = []
+        for memory in self.memories:
+            score = 0.0
+            
+            # Check content
+            content_lower = memory.content.lower()
+            for keyword in query_keywords:
+                if keyword in content_lower:
+                    score += 2.0
+            
+            # Check context (if query mentions similar things)
+            context_str = json.dumps(memory.context).lower()
+            for keyword in query_keywords:
+                if keyword in context_str:
+                    score += 1.0
+            
+            # Check tags
+            for tag in memory.tags:
+                if tag.lower() in query_lower:
+                    score += 1.5
+            
+            # Boost by importance score
+            score *= (1 + memory.importance_score)
+            
+            if score > 0:
+                scored_memories.append((score, memory))
+        
+        # Sort by score (descending) and take top results
+        scored_memories.sort(key=lambda x: x[0], reverse=True)
+        relevant_memories = [mem for score, mem in scored_memories[:limit]]
+        
+        console.print(f"[green]Found {len(relevant_memories)} relevant memories for query[/green]")
+        return relevant_memories
+    
     def get_memory_statistics(self) -> Dict[str, Any]:
         """Get memory statistics."""
         stats = {
@@ -1374,12 +1490,24 @@ class RoutingWorkflow:
         """Determine which specialist to use based on query."""
         query_lower = query.lower()
         
-        if any(word in query_lower for word in ["earnings", "revenue", "profit", "eps"]):
-            return "earnings"
-        elif any(word in query_lower for word in ["news", "announcement", "event", "sentiment"]):
-            return "news"
-        elif any(word in query_lower for word in ["price", "technical", "chart", "trend", "support", "resistance"]):
-            return "technical"
+        # Use LLM to classify query type
+        prompt = f"""Determine which specialist should handle this investment query.
+        
+                    Query: {query_lower}
+
+                    Available specialists:
+                    - earnings: For questions about financials, revenue, profit, EPS
+                    - news: For questions about announcements, events, sentiment
+                    - technical: For questions about price action, charts, trends
+                    - general: For other investment questions
+
+                    Return just one word - the specialist type that best matches."""
+
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        specialist = response.content.strip().lower()
+        
+        if specialist in ["earnings", "news", "technical"]:
+            return specialist
         else:
             return "general"
     
@@ -1391,16 +1519,16 @@ class RoutingWorkflow:
         
         prompt = f"""You are an earnings specialist. Analyze the financial metrics for {stock_symbol}.
         
-Financial Data: {json.dumps(financial_data, indent=2)}
+                Financial Data: {json.dumps(financial_data, indent=2)}
 
-Focus on:
-- Revenue and earnings trends
-- Profitability metrics
-- Growth indicators
-- Valuation ratios
+                Focus on:
+                - Revenue and earnings trends
+                - Profitability metrics
+                - Growth indicators
+                - Valuation ratios
 
-Provide specific insights about earnings quality and sustainability."""
-        
+                Provide specific insights about earnings quality and sustainability."""
+                        
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
     
@@ -1412,16 +1540,16 @@ Provide specific insights about earnings quality and sustainability."""
         
         prompt = f"""You are a news sentiment specialist. Analyze news for {stock_symbol}.
         
-News Data: {json.dumps(news_data, indent=2)}
+                News Data: {json.dumps(news_data, indent=2)}
 
-Focus on:
-- Sentiment trends
-- Key events and their impact
-- Market perception
-- Potential catalysts
+                Focus on:
+                - Sentiment trends
+                - Key events and their impact
+                - Market perception
+                - Potential catalysts
 
-Provide actionable insights from news analysis."""
-        
+                Provide actionable insights from news analysis."""
+                        
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
     
@@ -1433,17 +1561,17 @@ Provide actionable insights from news analysis."""
         
         prompt = f"""You are a technical analysis specialist. Analyze price action for {stock_symbol}.
         
-Price Data: Latest ${price_data.get('latest_price', 'N/A')}
-Technical Indicators: {json.dumps(price_data.get('technical_indicators', {}), indent=2)}
+                    Price Data: Latest ${price_data.get('latest_price', 'N/A')}
+                    Technical Indicators: {json.dumps(price_data.get('technical_indicators', {}), indent=2)}
 
-Focus on:
-- Trend direction and strength
-- Support/resistance levels
-- Technical indicator signals
-- Entry/exit points
+                    Focus on:
+                    - Trend direction and strength
+                    - Support/resistance levels
+                    - Technical indicator signals
+                    - Entry/exit points
 
-Provide specific technical trading insights."""
-        
+                    Provide specific technical trading insights."""
+                            
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
     
@@ -1453,11 +1581,11 @@ Provide specific technical trading insights."""
         
         prompt = f"""You are a general investment specialist. Answer this query about {stock_symbol}.
         
-Query: {query}
-Available Data: {json.dumps(data, indent=2)[:500]}...
+                    Query: {query}
+                    Available Data: {json.dumps(data, indent=2)[:500]}...
 
-Provide a comprehensive, balanced analysis addressing the specific question."""
-        
+                    Provide a comprehensive, balanced analysis addressing the specific question."""
+                            
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
 
@@ -1510,23 +1638,23 @@ class EvaluatorOptimizerWorkflow:
         
         prompt = f"""Evaluate this investment analysis for quality.
         
-Analysis:
-{analysis}
+                    Analysis:
+                    {analysis}
 
-Rate on scale of 1-10 for:
-1. Completeness (covers all key aspects)
-2. Accuracy (logical and well-reasoned)
-3. Actionability (provides clear recommendations)
-4. Clarity (easy to understand)
+                    Rate on scale of 1-10 for:
+                    1. Completeness (covers all key aspects)
+                    2. Accuracy (logical and well-reasoned)
+                    3. Actionability (provides clear recommendations)
+                    4. Clarity (easy to understand)
 
-Format:
-Completeness: X/10
-Accuracy: X/10
-Actionability: X/10
-Clarity: X/10
-Overall: X/10
-Issues: [list specific issues to improve]"""
-        
+                    Format:
+                    Completeness: X/10
+                    Accuracy: X/10
+                    Actionability: X/10
+                    Clarity: X/10
+                    Overall: X/10
+                    Issues: [list specific issues to improve]"""
+                            
         response = self.llm.invoke([HumanMessage(content=prompt)])
         
         # Parse the evaluation (simplified)
@@ -1549,17 +1677,17 @@ Issues: [list specific issues to improve]"""
         
         prompt = f"""Improve this investment analysis based on the evaluation feedback.
         
-Original Analysis:
-{analysis}
+                Original Analysis:
+                {analysis}
 
-Evaluation Feedback:
-{evaluation['detailed_evaluation']}
+                Evaluation Feedback:
+                {evaluation['detailed_evaluation']}
 
-Specific Issues to Address:
-{evaluation['issues']}
+                Specific Issues to Address:
+                {evaluation['issues']}
 
-Provide an improved version that addresses all issues while maintaining accuracy."""
-        
+                Provide an improved version that addresses all issues while maintaining accuracy."""
+                        
         response = self.llm.invoke([HumanMessage(content=prompt)])
         console.print("[green]✓ Analysis optimized[/green]")
         
@@ -1575,11 +1703,20 @@ class InvestmentAgent:
     
     def __init__(self, config_path: Optional[str] = None):
         self.config = self._load_config(config_path)
-        self.tools = [get_stock_prices, get_financial_metrics, search_web, calculate]
+        self.tools = [
+            get_stock_prices, 
+            get_financial_metrics, 
+            get_alpha_vantage_quote,
+            get_alpha_vantage_overview,
+            get_alpha_vantage_news,
+            search_web, 
+            calculate
+        ]
         self.llm = ChatOpenAI(model='gpt-4o-mini', openai_api_key=OPENAI_API_KEY)
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.graph = self._build_graph()
         self.data_wrapper = YahooFinanceDataWrapper()
+        self.alpha_vantage_wrapper = AlphaVantageDataWrapper()
         self.web_tools_wrapper = WebToolsWrapper()
         self.analyzer = Analyzer()
         self.memory_system = MemorySystem()
@@ -1634,14 +1771,18 @@ class InvestmentAgent:
             # First call - add system prompt
             ANALYST_PROMPT = f"""You are a financial analyst specializing in stock evaluation for {stock_symbol}.
 
-You have access to these tools:
-1. **get_stock_prices**: Get price data and technical indicators
-2. **get_financial_metrics**: Get financial metrics and ratios
-3. **search_web**: Search for latest news and information
-4. **calculate**: Perform financial calculations
+                You have access to these tools:
+                1. **get_stock_prices**: Get price data and technical indicators from Yahoo Finance
+                2. **get_financial_metrics**: Get financial metrics and ratios from Yahoo Finance
+                3. **get_alpha_vantage_quote**: Get real-time quote from Alpha Vantage (alternative source)
+                4. **get_alpha_vantage_overview**: Get company overview from Alpha Vantage (alternative source)
+                5. **get_alpha_vantage_news**: Get news and sentiment from Alpha Vantage
+                6. **search_web**: Search for latest news and information
+                7. **calculate**: Perform financial calculations
 
-Start by gathering data using the tools, then provide comprehensive analysis."""
-            
+                Start by gathering data using the tools. Use Alpha Vantage tools as alternatives if Yahoo Finance fails.
+                Then provide comprehensive analysis."""
+                            
             messages.insert(0, SystemMessage(content=ANALYST_PROMPT))
         
         # Invoke the LLM with tools
@@ -1653,6 +1794,193 @@ Start by gathering data using the tools, then provide comprehensive analysis."""
             "analysis_data": state.get("analysis_data", {}),
             "final_analysis": state.get("final_analysis", {})
         }
+    
+    def extract_stock_symbol(self, natural_query: str) -> Dict[str, Any]:
+        """
+        Extract stock symbol from a natural language query using memory and web search.
+        
+        Args:
+            natural_query: Natural language query like "What's the latest on Apple stock?"
+            
+        Returns:
+            Dict containing the stock symbol and confidence
+        """
+        console.print(f"[cyan]Extracting stock symbol from query...[/cyan]")
+        
+        # First check for most recent stock symbol from query history
+        console.print("[dim]→ Checking most recent stock symbol from query history...[/dim]")
+        if self.memory_system.memories:
+            # Get memories sorted by timestamp (most recent first)
+            sorted_memories = sorted(
+                self.memory_system.memories, 
+                key=lambda m: m.timestamp, 
+                reverse=True
+            )
+            
+            # Find the most recent memory with a valid stock symbol
+            for memory in sorted_memories[:10]:  # Check last 10 memories
+                if memory.stock_symbol and memory.stock_symbol.isalpha() and len(memory.stock_symbol) <= 5:
+                    console.print(f"[green]✓ Found most recent stock symbol from history: {memory.stock_symbol}[/green]")
+                    console.print(f"[dim]  From: {memory.timestamp}[/dim]")
+                    console.print(f"[dim]  Memory: {memory.content[:100]}...[/dim]")
+                    return {
+                        "stock_symbol": memory.stock_symbol,
+                        "confidence": "high",
+                        "method": "recent_history",
+                        "original_query": natural_query,
+                        "memory_content": memory.content[:200],
+                        "memory_timestamp": memory.timestamp
+                    }
+        
+        # Second, check memory for keyword-matched queries
+        console.print("[dim]→ Searching memory for keyword-matched queries...[/dim]")
+        memories = self.memory_system.search_memories(natural_query, limit=3)
+        
+        if memories:
+            # Check if any memory has a valid stock symbol
+            for memory in memories:
+                if memory.stock_symbol and memory.stock_symbol.isalpha() and len(memory.stock_symbol) <= 5:
+                    console.print(f"[green]✓ Found stock symbol in keyword-matched memory: {memory.stock_symbol}[/green]")
+                    console.print(f"[dim]  Memory: {memory.content[:100]}...[/dim]")
+                    return {
+                        "stock_symbol": memory.stock_symbol,
+                        "confidence": "high",
+                        "method": "memory_keyword_match",
+                        "original_query": natural_query,
+                        "memory_content": memory.content[:200]
+                    }
+        
+        # Try web search if memory doesn't help
+        console.print("[dim]→ No relevant memories found, trying web search...[/dim]")
+        try:
+            search_result = self._extract_symbol_via_web_search(natural_query)
+            if search_result["stock_symbol"]:
+                # Store in memory for future queries
+                self._store_extraction_in_memory(
+                    search_result["stock_symbol"], 
+                    natural_query, 
+                    "web_search"
+                )
+                return search_result
+        except Exception as e:
+            console.print(f"[yellow]Web search failed: {str(e)}[/yellow]")
+
+        # Fall back to LLM extraction if both memory and web search fail
+        console.print("[dim]→ Trying LLM extraction...[/dim]")
+        extraction_prompt = f"""Extract the stock ticker symbol from this query. If you can identify the company name, 
+            provide the stock ticker symbol. If a ticker is already mentioned, return it in uppercase.
+
+            Query: {natural_query}
+
+            Respond with ONLY the stock ticker symbol (e.g., AAPL, MSFT, GOOGL, TSLA) or "UNKNOWN" if you cannot identify it.
+            Do not include any explanation, just the ticker symbol."""
+
+        try:
+            response = self.llm.invoke([HumanMessage(content=extraction_prompt)])
+            extracted_symbol = response.content.strip().upper()
+            
+            # Validate the extracted symbol
+            if extracted_symbol != "UNKNOWN" and len(extracted_symbol) <= 5 and extracted_symbol.isalpha():
+                console.print(f"[green]✓ Extracted stock symbol via LLM: {extracted_symbol}[/green]")
+                
+                # Store in memory for future queries
+                self._store_extraction_in_memory(
+                    extracted_symbol, 
+                    natural_query, 
+                    "llm_extraction"
+                )
+                
+                return {
+                    "stock_symbol": extracted_symbol,
+                    "confidence": "medium",
+                    "method": "llm_extraction",
+                    "original_query": natural_query
+                }
+            
+        except Exception as e:
+            console.print(f"[yellow]LLM extraction failed: {str(e)}[/yellow]")
+
+        # If all methods fail
+        console.print("[red]✗ Could not extract stock symbol[/red]")
+        return {
+            "stock_symbol": None,
+            "confidence": "none", 
+            "method": "failed",
+            "original_query": natural_query,
+            "error": "Unable to identify stock symbol from query"
+        }
+    
+    def _store_extraction_in_memory(self, stock_symbol: str, query: str, method: str) -> None:
+        """Store successful symbol extraction in memory for future queries."""
+        try:
+            self.memory_system.add_memory(
+                stock_symbol=stock_symbol,
+                memory_type="symbol_extraction",
+                content=f"Query: '{query}' -> Symbol: {stock_symbol}",
+                context={
+                    "query": query,
+                    "method": method,
+                    "extraction_timestamp": datetime.now().isoformat()
+                },
+                importance_score=0.7,
+                tags=["extraction", method, query.lower()[:50]]
+            )
+            console.print(f"[dim]✓ Stored extraction in memory[/dim]")
+        except Exception as e:
+            console.print(f"[dim yellow]Warning: Could not store in memory: {str(e)}[/dim yellow]")
+            
+    def _extract_symbol_via_web_search(self, natural_query: str) -> Dict[str, Any]:
+        """Extract stock symbol using web search."""
+        try:
+            # Search for the company + stock ticker
+            search_query = f"{natural_query} stock ticker symbol"
+            search_result = self.web_tools_wrapper.web_search(search_query)
+            
+            if "error" not in search_result and search_result.get('results'):
+                # Use LLM to parse the search results and extract ticker
+                results_text = "\n".join([
+                    f"{r.get('title', '')}: {r.get('content', '')[:200]}"
+                    for r in search_result['results'][:3]
+                ])
+                
+                parsing_prompt = f"""Based on these search results about "{natural_query}", what is the stock ticker symbol?
+
+                Search Results:
+                {results_text}
+
+                Respond with ONLY the stock ticker symbol in uppercase (e.g., AAPL, MSFT) or "UNKNOWN" if unclear."""
+
+                response = self.llm.invoke([HumanMessage(content=parsing_prompt)])
+                extracted_symbol = response.content.strip().upper()
+                
+                if extracted_symbol != "UNKNOWN" and len(extracted_symbol) <= 5 and extracted_symbol.isalpha():
+                    console.print(f"[green]✓ Extracted via web search: {extracted_symbol}[/green]")
+                    return {
+                        "stock_symbol": extracted_symbol,
+                        "confidence": "medium",
+                        "method": "web_search",
+                        "original_query": natural_query
+                    }
+            
+            # If all else fails
+            console.print("[red]✗ Could not extract stock symbol[/red]")
+            return {
+                "stock_symbol": None,
+                "confidence": "none",
+                "method": "failed",
+                "original_query": natural_query,
+                "error": "Unable to identify stock symbol from query"
+            }
+            
+        except Exception as e:
+            console.print(f"[red]Web search extraction failed: {str(e)}[/red]")
+            return {
+                "stock_symbol": None,
+                "confidence": "none",
+                "method": "failed",
+                "original_query": natural_query,
+                "error": str(e)
+            }
 
     def analyze_stock(self, stock_symbol: str, user_question: str = "Should I buy this stock?") -> Dict[str, Any]:
         """Execute comprehensive stock analysis using LangGraph."""
@@ -1858,27 +2186,159 @@ Start by gathering data using the tools, then provide comprehensive analysis."""
         return result
     
     def _collect_stock_data(self, stock_symbol: str) -> Dict[str, Any]:
-        """Collect all necessary stock data."""
+        """Collect all necessary stock data, randomly choosing between Yahoo Finance and Alpha Vantage."""
         data = {}
         
-        try:
-            data["historical_prices"] = self.data_wrapper.fetch_historical_prices(stock_symbol)
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not fetch prices: {str(e)}[/yellow]")
-            data["historical_prices"] = {}
+        # Randomly choose primary data source
+        use_yahoo_first = random.choice([True, False])
+        primary_source = "Yahoo Finance" if use_yahoo_first else "Alpha Vantage"
+        fallback_source = "Alpha Vantage" if use_yahoo_first else "Yahoo Finance"
         
-        try:
-            financial_result = self.data_wrapper.fetch_key_financials(stock_symbol)
-            data["financial_metrics"] = financial_result.get("key_metrics", {})
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not fetch financials: {str(e)}[/yellow]")
-            data["financial_metrics"] = {}
+        console.print(f"[bold magenta] Randomly selected primary source: {primary_source}[/bold magenta]")
         
-        try:
-            data["news_data"] = self.data_wrapper.fetch_stock_news(stock_symbol)
-        except Exception as e:
-            console.print(f"[yellow]Warning: Could not fetch news: {str(e)}[/yellow]")
-            data["news_data"] = {}
+        # Fetch historical prices
+        if use_yahoo_first:
+            # Try Yahoo Finance first
+            try:
+                data["historical_prices"] = self.data_wrapper.fetch_historical_prices(stock_symbol)
+                if "error" in data["historical_prices"]:
+                    raise Exception("Yahoo Finance returned error")
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} prices failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    av_prices = self.alpha_vantage_wrapper.fetch_daily_prices(stock_symbol, outputsize="compact")
+                    if "error" not in av_prices:
+                        data["historical_prices"] = av_prices
+                        console.print(f"[green]✓ Using {fallback_source} price data[/green]")
+                    else:
+                        data["historical_prices"] = {}
+                except Exception as av_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(av_e)}[/red]")
+                    data["historical_prices"] = {}
+        else:
+            # Try Alpha Vantage first
+            try:
+                av_prices = self.alpha_vantage_wrapper.fetch_daily_prices(stock_symbol, outputsize="compact")
+                if "error" in av_prices:
+                    raise Exception("Alpha Vantage returned error")
+                data["historical_prices"] = av_prices
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} prices failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    data["historical_prices"] = self.data_wrapper.fetch_historical_prices(stock_symbol)
+                    if "error" in data["historical_prices"]:
+                        data["historical_prices"] = {}
+                    else:
+                        console.print(f"[green]✓ Using {fallback_source} price data[/green]")
+                except Exception as yf_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(yf_e)}[/red]")
+                    data["historical_prices"] = {}
+        
+        # Fetch financial metrics
+        if use_yahoo_first:
+            # Try Yahoo Finance first
+            try:
+                financial_result = self.data_wrapper.fetch_key_financials(stock_symbol)
+                if "error" in financial_result:
+                    raise Exception("Yahoo Finance returned error")
+                data["financial_metrics"] = financial_result.get("key_metrics", {})
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} metrics failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    av_overview = self.alpha_vantage_wrapper.fetch_company_overview(stock_symbol)
+                    if "error" not in av_overview:
+                        data["financial_metrics"] = {
+                            "symbol": av_overview.get("symbol"),
+                            "company_name": av_overview.get("company_name"),
+                            "sector": av_overview.get("sector"),
+                            "industry": av_overview.get("industry"),
+                            "market_cap": av_overview.get("market_cap"),
+                            "pe_ratio": av_overview.get("pe_ratio"),
+                            "beta": av_overview.get("beta"),
+                        }
+                        console.print(f"[green]✓ Using {fallback_source} financial data[/green]")
+                    else:
+                        data["financial_metrics"] = {}
+                except Exception as av_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(av_e)}[/red]")
+                    data["financial_metrics"] = {}
+        else:
+            # Try Alpha Vantage first
+            try:
+                av_overview = self.alpha_vantage_wrapper.fetch_company_overview(stock_symbol)
+                if "error" in av_overview:
+                    raise Exception("Alpha Vantage returned error")
+                data["financial_metrics"] = {
+                    "symbol": av_overview.get("symbol"),
+                    "company_name": av_overview.get("company_name"),
+                    "sector": av_overview.get("sector"),
+                    "industry": av_overview.get("industry"),
+                    "market_cap": av_overview.get("market_cap"),
+                    "pe_ratio": av_overview.get("pe_ratio"),
+                    "beta": av_overview.get("beta"),
+                }
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} metrics failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    financial_result = self.data_wrapper.fetch_key_financials(stock_symbol)
+                    if "error" in financial_result:
+                        data["financial_metrics"] = {}
+                    else:
+                        data["financial_metrics"] = financial_result.get("key_metrics", {})
+                        console.print(f"[green]✓ Using {fallback_source} financial data[/green]")
+                except Exception as yf_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(yf_e)}[/red]")
+                    data["financial_metrics"] = {}
+        
+        # Fetch news
+        if use_yahoo_first:
+            # Try Yahoo Finance first
+            try:
+                news_result = self.data_wrapper.fetch_stock_news(stock_symbol)
+                if "error" in news_result:
+                    raise Exception("Yahoo Finance returned error")
+                data["news_data"] = news_result
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} news failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    av_news = self.alpha_vantage_wrapper.fetch_market_news_sentiment(tickers=stock_symbol, limit=10)
+                    if "error" not in av_news:
+                        data["news_data"] = {
+                            "symbol": stock_symbol,
+                            "total_articles": av_news.get("total_articles", 0),
+                            "news": av_news.get("articles", []),
+                            "sentiment_summary": av_news.get("sentiment_summary", {})
+                        }
+                        console.print(f"[green]✓ Using {fallback_source} news data[/green]")
+                    else:
+                        data["news_data"] = {}
+                except Exception as av_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(av_e)}[/red]")
+                    data["news_data"] = {}
+        else:
+            # Try Alpha Vantage first
+            try:
+                av_news = self.alpha_vantage_wrapper.fetch_market_news_sentiment(tickers=stock_symbol, limit=10)
+                if "error" in av_news:
+                    raise Exception("Alpha Vantage returned error")
+                data["news_data"] = {
+                    "symbol": stock_symbol,
+                    "total_articles": av_news.get("total_articles", 0),
+                    "news": av_news.get("articles", []),
+                    "sentiment_summary": av_news.get("sentiment_summary", {})
+                }
+            except Exception as e:
+                console.print(f"[yellow]{primary_source} news failed: {str(e)}. Trying {fallback_source}...[/yellow]")
+                try:
+                    news_result = self.data_wrapper.fetch_stock_news(stock_symbol)
+                    if "error" in news_result:
+                        data["news_data"] = {}
+                    else:
+                        data["news_data"] = news_result
+                        console.print(f"[green]✓ Using {fallback_source} news data[/green]")
+                except Exception as yf_e:
+                    console.print(f"[red]{fallback_source} also failed: {str(yf_e)}[/red]")
+                    data["news_data"] = {}
         
         return data
     
@@ -1886,15 +2346,23 @@ Start by gathering data using the tools, then provide comprehensive analysis."""
         """Determine which workflow to use based on query."""
         query_lower = query.lower()
         
-        # News chain for news-focused queries
-        if any(word in query_lower for word in ["news", "headlines", "announcements", "sentiment", "media"]):
-            return "news_chain"
+        # Use LLM to determine workflow based on query content and intent
+        prompt = f"""Determine the most appropriate workflow for this investment query.
+
+                Query: {query}
+
+                Available workflows:
+                - news_chain: For queries focused on news, headlines, announcements, sentiment analysis
+                - routing: For specialist queries about earnings, technicals, or specific metrics
+                - comprehensive: For general investment questions needing broad analysis
+
+                Return just one word - the workflow that best matches."""
+
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        workflow = response.content.strip().lower()
         
-        # Routing for specialist queries
-        elif any(word in query_lower for word in ["earnings", "revenue", "profit", "technical", "price", "chart"]):
-            return "routing"
-        
-        # Comprehensive for general queries
+        if workflow in ["news_chain", "routing"]:
+            return workflow
         else:
             return "comprehensive"
     
@@ -1902,37 +2370,37 @@ Start by gathering data using the tools, then provide comprehensive analysis."""
         """Generate comprehensive analysis combining all data."""
         prompt = f"""Provide a comprehensive investment analysis for {stock_symbol}.
 
-User Query: {query}
+                User Query: {query}
 
-Price Data: Latest ${data.get('historical_prices', {}).get('latest_price', 'N/A')}
-Change: {data.get('historical_prices', {}).get('price_change_pct', 'N/A')}%
+                Price Data: Latest ${data.get('historical_prices', {}).get('latest_price', 'N/A')}
+                Change: {data.get('historical_prices', {}).get('price_change_pct', 'N/A')}%
 
-Financial Metrics:
-- P/E Ratio: {data.get('financial_metrics', {}).get('pe_ratio', 'N/A')}
-- Market Cap: {data.get('financial_metrics', {}).get('market_cap', 'N/A')}
-- Recommendation: {data.get('financial_metrics', {}).get('recommendation', 'N/A')}
+                Financial Metrics:
+                - P/E Ratio: {data.get('financial_metrics', {}).get('pe_ratio', 'N/A')}
+                - Market Cap: {data.get('financial_metrics', {}).get('market_cap', 'N/A')}
+                - Recommendation: {data.get('financial_metrics', {}).get('recommendation', 'N/A')}
 
-News Articles: {len(data.get('news_data', {}).get('news', []))} articles available
+                News Articles: {len(data.get('news_data', {}).get('news', []))} articles available
 
-Provide:
-1. Overall assessment
-2. Key strengths and risks
-3. Investment recommendation
-4. Price target or action items
+                Provide:
+                1. Overall assessment
+                2. Key strengths and risks
+                3. Investment recommendation
+                4. Price target or action items
 
-Be specific and actionable."""
+                Be specific and actionable."""
 
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
 
-# =============================================================================
-# EXAMPLE USAGE
-# =============================================================================
+
+
 def main():
     """Main function demonstrating agentic workflow capabilities."""
     console.print(Panel.fit(
         "[bold cyan]Investment Research Agent[/bold cyan]\n"
-        "[white]Powered by Agentic Workflows[/white]",
+        "[white]Powered by Agentic Workflows[/white]\n"
+        "[dim]With Natural Language Query Support & Alpha Vantage Integration[/dim]",
         border_style="cyan"
     ))
     
@@ -1941,30 +2409,99 @@ def main():
     agent = InvestmentAgent()
 
     while True:
-        console.print("\n")
-        stock_symbol = console.input("[bold cyan]Enter stock symbol (or 'quit' to exit): [/bold cyan]").upper()
-        
-        if stock_symbol.lower() == 'quit':
+        console.print("\n" + "-" * 60)
+        console.print("[bold]Enter your query about a stock:[/bold]")
+        console.print("\n[bold]Examples:[/bold]")
+        console.print("  • What's the latest updates on Apple stock?")
+        console.print("  • Should I invest in Tesla?")
+        console.print("  • Tell me about Microsoft's performance")
+        console.print("  • Is Google a good buy right now?")
+        console.print("  • Type 'quit' to exit")
+            
+        natural_query = console.input("\n[bold cyan]Your natural language query: [/bold cyan]").strip()
+            
+        if natural_query.lower() == 'quit':
             break
             
-        # Get user query
-        console.print("\n[bold]Example queries:[/bold]")
+        # Extract stock symbol from natural query
+        console.print("\n" + "-" * 60)
+        extraction_result = agent.extract_stock_symbol(natural_query)
+            
+        if extraction_result.get('stock_symbol'):
+            stock_symbol = extraction_result['stock_symbol']
+            console.print(f"\n[bold green]✓ Identified Stock: {stock_symbol}[/bold green]")
+            console.print(f"[dim]Confidence: {extraction_result['confidence']} | Method: {extraction_result['method']}[/dim]")
+                
+            # Ask for confirmation
+            confirm = console.input(f"\n[bold cyan]Proceed with {stock_symbol}? (yes/no): [/bold cyan]").lower().strip()
+            if confirm not in ['yes', 'y']:
+                console.print("[yellow]Let me try a web search to find the correct stock...[/yellow]")
+                
+                # Fallback: Try web search
+                try:
+                    console.print(f"[dim]→ Searching web for: {natural_query}[/dim]")
+                    web_search_result = agent._extract_symbol_via_web_search(natural_query)
+                    
+                    if web_search_result.get('stock_symbol') and web_search_result['stock_symbol'] != stock_symbol:
+                        stock_symbol = web_search_result['stock_symbol']
+                        console.print(f"\n[bold green]✓ Found alternative stock via web search: {stock_symbol}[/bold green]")
+                        console.print(f"[dim]Confidence: {web_search_result['confidence']} | Method: {web_search_result['method']}[/dim]")
+                        
+                        # Ask for confirmation again
+                        confirm2 = console.input(f"\n[bold cyan]Proceed with {stock_symbol}? (yes/no): [/bold cyan]").lower().strip()
+                        if confirm2 not in ['yes', 'y']:
+                            console.print("[yellow]Skipping this query...[/yellow]")
+                            continue
+                    else:
+                        # If web search also fails or returns same symbol, ask user to manually enter
+                        console.print("[yellow]Web search didn't find a different stock symbol.[/yellow]")
+                        manual_symbol = console.input("\n[bold cyan]Please enter the stock symbol manually (or press Enter to skip): [/bold cyan]").strip().upper()
+                        
+                        if manual_symbol and manual_symbol.isalpha() and len(manual_symbol) <= 5:
+                            stock_symbol = manual_symbol
+                            console.print(f"[green]✓ Using manually entered symbol: {stock_symbol}[/green]")
+                        else:
+                            console.print("[yellow]Skipping this query...[/yellow]")
+                            continue
+                            
+                except Exception as e:
+                    console.print(f"[red]Web search fallback failed: {str(e)}[/red]")
+                    console.print("[yellow]Skipping this query...[/yellow]")
+                    continue
+                
+            natural_query_used = True
+        else:
+            console.print(f"\n[bold red]✗ Could not identify stock symbol[/bold red]")
+            console.print(f"[yellow]Error: {extraction_result.get('error', 'Unknown error')}[/yellow]")
+            console.print("\n[dim]Please try again with a more specific query.[/dim]")
+            continue
+        
+        # Now we have a valid stock_symbol, get the analysis query
+        console.print("\n[bold]Example analysis queries:[/bold]")
         console.print("  • What's the latest news sentiment for this stock?")
         console.print("  • Should I buy this stock based on technical analysis?")
         console.print("  • How are the earnings looking?")
         console.print("  • Give me a comprehensive investment analysis")
         
-        user_query = console.input("\n[bold cyan]Your question (or 'quit' to exit): [/bold cyan]")
-        
-        if user_query.lower() == 'quit':
-            break
+        if natural_query_used:
+            # Use the original natural language query as the analysis query
+            user_query = natural_query
+            console.print(f"\n[dim]Using your natural language query for analysis...[/dim]")
+        else:
+            user_query = console.input("\n[bold cyan]Your analysis question (or press Enter for comprehensive analysis): [/bold cyan]").strip()
             
+            if user_query.lower() == 'quit':
+                break
+            
+            if not user_query:
+                user_query = "Give me a comprehensive investment analysis"
+        
         # Execute the main query with agentic workflows
-        console.print("\n" + "=" * 60)
+        console.print("\n" + "-" * 60)
         result = agent.query(stock_symbol, user_query, use_optimizer=True)
         
         # Display results
-        console.print("\n" + "=" * 60)
+        console.print("\n" + "-" * 60)
         console.print(Panel.fit(
             "[bold green]Analysis Complete[/bold green]",
             border_style="green"
@@ -2031,7 +2568,7 @@ def main():
             f.write(markdown_content)
         
         console.print(f"\n[green]✓ Analysis saved to:[/green] [cyan]{filename}[/cyan]")
-        console.print("\n" + "=" * 60)
+        console.print("\n" + "-" * 60)
 
     console.print("\n[bold cyan]Thank you for using Investment Research Agent![/bold cyan]\n")
 
